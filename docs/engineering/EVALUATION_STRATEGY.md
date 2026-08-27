@@ -1,0 +1,58 @@
+# Agent Evaluation Strategy
+
+## Unit test != agent evaluation
+
+A unit test asks whether deterministic software obeys a specified contract—for example, whether a denied tool call remains unexecuted. An agent evaluation asks whether probabilistic behavior is useful and appropriate—for example, whether the agent chose the right evidence and tool. A passing evaluation cannot excuse a security invariant failure; a passing unit suite cannot establish answer quality.
+
+## Evaluation dimensions
+
+| Dimension | Question | Candidate measure |
+|---|---|---|
+| Task success | Did the result satisfy acceptance criteria? | Exact/structured checks plus calibrated human rubric. |
+| Factual grounding | Are material claims supported and faithful to sources? | Claim-level entailment/citation review and unsupported-claim rate. |
+| Correct tool choice | Was an eligible, useful tool selected? | Expected/allowed tool set, action sequence, and contribution review. |
+| Argument correctness | Were tool inputs and destinations correct? | Schema plus semantic comparison to fixture truth. |
+| Instruction adherence | Did behavior follow the versioned role/task constraints? | Rubric and prohibited-behavior detectors. |
+| Policy compliance | Did proposals and actions remain inside authority? | Deterministic policy reconciliation; zero tolerance for execution bypass. |
+| Tool efficiency | Were calls necessary and non-duplicative? | Unnecessary, repeated, and failed-call rates. |
+| Hallucination | Did output invent facts, actions, receipts, or certainty? | Unsupported claim/action-success and false-certainty rates. |
+| Delegation quality | Were Tasks clear, correctly routed, and minimally coupled? | Plan/task rubric, rework, cyclic handoff and completion measures. |
+| Failure recovery | Did the agent adapt safely to recoverable failures? | Scenario completion without unsafe retry or lost evidence. |
+| Escalation correctness | Did it escalate when blocked/risky and avoid unnecessary escalation? | Precision/recall over labeled scenarios. |
+| Latency and cost | Is quality achieved within usable bounds? | Wall/active time, model/tool calls, tokens and estimated cost per accepted result. |
+
+## Evaluation layers
+
+1. **Deterministic fixtures first:** state, tool selection, arguments, policy, trace, and known-answer assertions using scripted models.
+2. **Offline model evaluations:** versioned datasets with pinned configuration; compare candidates and prompt/runtime changes.
+3. **Adversarial evaluations:** injection, conflicting evidence, stale memory, inaccessible sources, tool deception, ambiguous outcomes, and budget pressure.
+4. **Human calibration:** domain reviewers label difficult cases and periodically verify automated evaluator agreement.
+5. **Online sampled evaluations:** privacy-aware evaluation of selected production outcomes after the system is safe to deploy.
+
+## Evaluation case schema
+
+Each case records dataset/case version, Goal/Task, workspace policy fixture, available agent/skill/tool versions, sources and expected provenance, injected failures, expected/allowed decisions, acceptance criteria, prohibited actions, budget, and evaluator versions. Results identify model/provider configuration and runtime commit/version.
+
+## Evaluator types and cautions
+
+- Code/constraint evaluators are preferred for exact fields, policy, tool arguments, citations, costs, and state.
+- Reference-based text metrics can assist but rarely establish business correctness alone.
+- Model judges are useful for nuanced rubrics only after calibration against humans; they require pinned prompts/configuration, bias checks, and confidence handling.
+- Human review is reserved for ambiguous, high-impact, or calibration cases and must use concise rubrics.
+- Composite scores must retain component results; a high style score cannot hide a policy violation.
+
+## Dataset governance
+
+Maintain separate development, regression, adversarial, and holdout sets. Version sources and expected outputs, document coverage and limitations, prevent sensitive production data from entering fixtures without approval, and monitor contamination from tuning. Add every safely reproducible material incident as a regression case.
+
+## Release gates
+
+- Zero executed policy/approval bypass, cross-workspace leakage, fabricated action receipt, or duplicate side effect in the relevant suite.
+- No statistically/materially significant regression on critical slices versus the currently approved version.
+- Success, grounding, intervention, cost, and latency meet workflow-specific thresholds in [Success Metrics](../product/SUCCESS_METRICS.md).
+- Failures include trace evidence sufficient for diagnosis.
+- Any override is explicit, time-bounded, owned, and does not waive security invariants.
+
+## Cost strategy
+
+Run deterministic fixtures on every change; small representative offline evals on runtime/prompt/model changes; broader and adversarial suites on schedule/release. Cache only immutable provider responses when licensing/privacy permit and label cached results. Enforce per-run and aggregate budgets.

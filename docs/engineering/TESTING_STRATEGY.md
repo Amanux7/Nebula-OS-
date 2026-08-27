@@ -1,0 +1,67 @@
+# Testing Strategy
+
+## Objectives
+
+Tests protect domain invariants, tenant isolation, safe side effects, recoverability, policy enforcement, and reproducible behavior. The regular suite must run without paid services or live model calls. Tests are layered by failure locality rather than a single end-to-end pyramid.
+
+## Test layers
+
+| Layer | Scope | Representative assertions |
+|---|---|---|
+| Unit tests | Pure domain rules, parsers, transition functions, budget arithmetic | Illegal transitions rejected; permissions narrow; retry classifier correct. |
+| Schema tests | Versioned commands/events/model/tool contracts | Valid fixtures round-trip; unknown/old versions handled; size/enum constraints enforced. |
+| Contract tests | Ports and adapters, including provider/tool/secret/storage conformance | Every adapter maps errors and usage consistently and honors deadlines. |
+| Integration tests | Real local persistence/queue/index combinations | Transactions, outbox delivery, concurrency, migrations, deletion propagation. |
+| Agent Runtime tests | Loop driven by scripted Model Provider and clock | Decisions validate; limits, stalls, refusal, cancellation, and escalation reach correct states. |
+| Tool tests | Fake/sandbox connectors through Tool Runtime | Authorization, schemas, idempotency, receipts, ambiguous outcomes, rate limits, redaction. |
+| Workflow tests | Versioned deterministic/agentic step graphs | Dependencies, resume, partial failure, compensation, and cancellation propagation. |
+| Policy tests | Decision tables and adversarial identities/resources/actions | Deny-by-default, workspace isolation, approval requirements, revocation and expiry. |
+| Failure tests | Injected process/provider/storage/network failures | No hidden/lost work; bounded retries; recovery preserves exact state and avoids duplicates. |
+| End-to-end tests | Narrow user outcomes through deployed test stack | Goal to artifact/approval/trace works; failure is diagnosable; external effects use sandboxes. |
+
+## Deterministic test doubles
+
+- **Scripted model:** returns decisions, malformed payloads, refusals, delays, usage, and provider errors by scenario key.
+- **In-memory model:** applies simple deterministic rules for property/state tests; it is not presented as AI.
+- **Tool fake:** records requests and simulates receipts, transient/permanent failures, timeouts, and outcome-unknown responses.
+- **Clock and ID providers:** allow exact deadlines, expiry, retry, ordering, and trace assertions.
+- **Policy evaluator:** loads explicit decision tables; production policy adapters pass the same conformance suite.
+- **Knowledge/memory fixtures:** return provenance-bearing results with trust and access labels.
+
+Golden traces may assert stable structured fields, but volatile timestamps/IDs and free-form text should be normalized. A snapshot is not a substitute for semantic assertions.
+
+## Critical scenario matrix
+
+Every runtime-affecting change should consider:
+
+- happy completion, valid escalation, user cancellation, timeout, and budget exhaustion;
+- malformed and semantically invalid model/tool output;
+- prompt injection in knowledge and tool observations;
+- authorization denial, required approval, expired/revoked approval, and changed payload;
+- transient retry, permanent failure, ambiguous external outcome, and worker loss after side effect;
+- duplicate/out-of-order event delivery and concurrent state updates;
+- cross-workspace identifiers and data in caches, indexes, artifacts, jobs, and traces;
+- context overflow, stale knowledge/memory, repeated decisions, and cyclic handoffs;
+- telemetry/log redaction and trace completeness.
+
+## Test environments and live providers
+
+- Pull requests run lint/type/schema/unit/contract tests and fast integrations locally in CI.
+- Merge/nightly suites run real infrastructure containers, concurrency, failure injection, and security cases.
+- Optional scheduled/manual suites may call pinned live model/tool sandboxes with budgets and quarantined credentials.
+- Live results are AI evaluations or compatibility signals, not required for the deterministic correctness gate unless a release policy explicitly says so.
+- No test may perform a real consequential external action.
+
+## Fixtures and data
+
+Fixtures are synthetic or approved/de-identified, workspace-labeled, versioned, small enough to inspect, and include adversarial cases. Evaluation datasets are separated from developer tuning sets. Secrets are injected only into dedicated security/sandbox tests and never committed.
+
+## Quality gates
+
+Stage 1 will set language-specific coverage and mutation targets after tooling is chosen. Regardless of percentage, changes cannot merge with failing state-machine, tenant-isolation, approval-binding, idempotency, secret-redaction, or schema-compatibility tests. Flaky tests are defects: quarantine requires an owner, reason, and expiry.
+
+## Testability requirements for design
+
+All nondeterminism—model, time, IDs, network, scheduling, storage, and tool effects—must have controllable boundaries. Runtime behavior should be executable from fixtures without UI or provider access. Production incidents should yield minimized regression fixtures when sensitive data can be safely removed.
+
+Software correctness tests are complemented, not replaced, by [Evaluation Strategy](EVALUATION_STRATEGY.md).
