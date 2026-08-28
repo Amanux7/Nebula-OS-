@@ -44,8 +44,8 @@ Each journey identifies the user-visible flow and the important system interacti
 ## Journey E — Observe execution
 
 1. User opens an active or historical Execution.
-2. UI shows current state, agent/version, task, elapsed time, limits, and step timeline.
-3. Each step exposes source references, action category, tool status, state transition, and artifacts.
+2. UI shows current Execution and TaskAttempt state, exact AgentDefinitionVersion where applicable, elapsed time, and limits.
+3. A timeline projection correlates typed Actions, Observations, StateTransitions, Events, source references, approvals, and artifacts without storing them as one generic record.
 4. User may cancel, approve, or take over if authorized.
 
 **Success:** the user understands what happened without access to hidden chain-of-thought.
@@ -63,7 +63,7 @@ Each journey identifies the user-visible flow and the important system interacti
 ## Journey G — Inspect why something failed
 
 1. User sees a failed or escalated terminal state and a concise error category.
-2. Trace shows the failing step, sanitized inputs, attempts, tool/provider responses, and state transitions.
+2. Trace identifies the failing TaskAttempt or Action and shows sanitized request references, Observations, retries, provider/Tool outcome evidence, and StateTransitions.
 3. System distinguishes retryable, user-correctable, policy-denied, and permanent failures.
 4. User retries from a safe checkpoint, changes configuration as a new version, or takes over.
 

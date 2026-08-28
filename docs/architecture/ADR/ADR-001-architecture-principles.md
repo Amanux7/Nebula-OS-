@@ -13,11 +13,13 @@ Agent Company OS must eventually coordinate reasoning, deterministic work, exter
 1. **Build and validate the underlying runtime before a large agent catalog.** The initial product uses only agents justified by a complete workflow.
 2. **Keep Agent, Skill, Tool, Task, and Workflow distinct.** They have different ownership, versioning, execution, and security semantics.
 3. **Treat visualization as a projection.** Org and execution graphs reflect canonical definitions and state; they are not the source of truth.
-4. **Make execution state explicit and durable.** Every attempt and step has validated transitions, bounds, observations, and a terminal or waiting state.
+4. **Make execution semantics explicit and durable when required.** Goal, Task, TaskAttempt, and Execution have distinct lifecycles; Action, Observation, StateTransition, and Event are not collapsed into a generic step record.
 5. **Bound and permission autonomy.** Effective authority is least-privileged; consequential actions are policy-checked and approval-capable.
 6. **Prefer deterministic workflows when deterministic logic is sufficient.** Reasoning is used for ambiguity, synthesis, and judgment, not routine control flow.
 7. **Do not commit the core to a large agent framework until runtime needs are understood.** Libraries may be used behind typed ports after evaluation.
 8. **Do not store hidden chain-of-thought.** Persist structured decisions, evidence references, tool requests/results, and state transitions.
+9. **Use AI for judgment and software for guarantees.** Planning strategies may be deterministic, agentic, or hybrid, but domain validation, workspace isolation, permissions, bounds, version consistency, idempotency, and approvals remain deterministic enforcement concerns.
+10. **Make infrastructure earn its place.** Stage 1 begins with an application, typed domain layer, and in-memory/test adapters; databases, queues, brokers, workflow engines, frameworks, event sourcing, and service splits require demonstrated needs and separate decisions.
 
 ## Alternatives considered
 
@@ -41,6 +43,10 @@ Creates unnecessary nondeterminism, latency, cost, and testing difficulty. Rejec
 
 Simple for prototypes, but hides lifecycle, policy, retries, idempotency, and durable recovery. Rejected.
 
+### Use one polymorphic ExecutionStep record
+
+Offers a convenient timeline shape but conflates logical attempts, requested operations, returned information, state changes, and audit facts. Rejected as canonical domain vocabulary; trace projections may still combine typed records for display.
+
 ## Consequences
 
 ### Positive
@@ -60,4 +66,4 @@ Simple for prototypes, but hides lifecycle, policy, retries, idempotency, and du
 
 ### Follow-up decisions
 
-Separate ADRs are required for implementation language, persistence, job execution, model adapter, workflow representation, tenancy enforcement, retrieval approach, memory promotion, and production deployment. These remain open until their roadmap stage provides evidence.
+[ADR-002](ADR-002-execution-domain-semantics.md) defines Execution, TaskAttempt, Action, Observation, StateTransition, and Event semantics. [ADR-003](ADR-003-agent-definition-and-runtime-identity.md) defines AgentDefinition, AgentDefinitionVersion, and AgentRun terminology. Separate ADRs are still required for implementation language, any production persistence or job infrastructure, model adapter, Workflow representation, tenancy enforcement, retrieval, Memory promotion, and production deployment when their roadmap stage provides evidence.

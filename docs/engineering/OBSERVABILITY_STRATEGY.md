@@ -12,7 +12,8 @@ Every signal carries `workspace_id` in protected context and, when applicable:
 execution_id, root_execution_id, parent_execution_id
 agent_id, agent_definition_version
 goal_id, task_id, workflow_id, workflow_version
-execution_step_id, attempt
+task_attempt_id, agent_run_id
+action_id, observation_id, state_transition_id, event_id
 tool_id, tool_version, tool_call_id
 approval_request_id, evaluation_id
 ```
@@ -59,7 +60,7 @@ Redaction happens before telemetry export. Allowlisted fields, data classificati
 
 ## Events and state
 
-Canonical state transitions emit domain events after commitment through an outbox or equivalent. Telemetry loss must not lose or change business state. Conversely, logs do not prove an external action succeeded; a Tool receipt/reconciliation record does.
+Canonical current state and append-only StateTransition history are committed together. Selected committed facts may produce Events. Stage 1 does not require an outbox, broker, or event-sourced architecture; durable publication is added only for a real asynchronous consumer. Telemetry loss must not lose or change business state. Conversely, logs, Events, Actions, and statuses do not prove an external action succeeded; a Tool receipt/reconciliation Observation does.
 
 ## User and operator views
 

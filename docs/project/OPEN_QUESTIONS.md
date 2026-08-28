@@ -15,20 +15,24 @@ These decisions are intentionally unresolved. “Target stage” indicates when 
 
 | ID | Question | Why it matters | Evidence needed | Target stage |
 |---|---|---|---|---|
-| OQ-005 | Should the orchestrator itself be an Agent, a deterministic service, or a hybrid? | Changes evaluation, permissions, and failure modes. | Stage 2 runtime and Stage 6 planning prototypes. | Stage 6 |
+| OQ-005 | Which replaceable planning strategy should be used for each workflow: agentic, deterministic, or hybrid? | Changes evaluation, cost, permissions, and failure modes while the PlanningPort seam remains stable. | Stage 2 runtime and Stage 6 planning prototypes against one Structured Plan contract. | Stage 6 |
 | OQ-006 | Where should durable Workflow state live and which component owns transitions? | Affects recovery and technology selection. | State-machine scenarios, timer/approval/cancellation requirements. | Stage 1/6 |
 | OQ-007 | Should Workflows be sequences, general directed graphs, statecharts, or a constrained combination? | Determines authoring complexity and execution semantics. | Real workflow fixtures, compensation and cycle needs. | Stage 6 |
 | OQ-008 | How should agent-to-agent messages and handoffs be represented? | Needed for attribution, ordering, access control, and loop prevention. | Multi-agent failure/use-case scenarios. | Stage 7 |
 | OQ-009 | Does Department hierarchy need nesting or membership constraints? | Impacts governance and selection but may add organizational rigidity. | Customer organization patterns. | Stage 8 |
-| OQ-010 | How should Agent/Skill/Workflow definitions be versioned, activated, and migrated? | Executions require reproducibility while configuration evolves. | Stage 1 schema/version UX prototype. | Stage 1/8 |
+| OQ-010 | How should AgentDefinitionVersion, Skill, and Workflow versions be drafted, activated, deprecated, rolled back, and migrated? | Immutable historical binding is decided, but operational lifecycle and UX remain open. | Stage 1 reference semantics and Stage 8 registry/activation prototype. | Stage 1/8 |
 | OQ-011 | What exactly qualifies as a Skill versus Workflow, instruction module, or Tool composition? | Prevents abstraction overlap and unusable registry entries. | Three to five concrete capabilities modeled both ways. | Stage 1/3 |
+| OQ-028 | Should AgentRun be a standalone persistent entity or a typed invocation/run record owned by TaskAttempt? | The term is fixed, but persistence should follow Stage 2 query, lifecycle, and audit needs. | Single-agent runtime scenarios and trace queries. | Stage 2 |
+| OQ-029 | What are the exact typed Action and Observation families and lifecycles? | They must remain distinct without creating a generic nullable envelope. | Model, approval, retrieval, and Tool scenarios as their stages begin. | Stage 2–4 |
+| OQ-030 | Which lifecycle changes produce Events, and what retention/delivery semantics are required? | Minimal audit records are useful, but durable messaging and replay add cost. | Actual projection/integration consumers and operational requirements. | Stage 1 for envelope; later for delivery |
+| OQ-031 | How should partial Goal satisfaction and Task compensation be represented? | A failed attempt need not fail a Goal, but complex outcomes need product semantics. | Representative multi-Task workflows and user expectations. | Stage 6 |
 
 ## Knowledge and memory
 
 | ID | Question | Why it matters | Evidence needed | Target stage |
 |---|---|---|---|---|
-| OQ-012 | Do Agents own Memory, access shared Memory, or both under scopes? | Changes privacy, relevance, duplication, and portability. | Memory use cases and isolation experiments. | Stage 5 |
-| OQ-013 | How should Knowledge and Memory differ operationally in retrieval and conflict resolution? | Prevents stale experience overriding source truth. | Stage 4 retrieval baseline and Stage 5 conflict fixtures. | Stage 5 |
+| OQ-012 | Do AgentRuns access Agent-scoped, user-scoped, Workspace-scoped, or shared Memory, and who owns each? | Changes privacy, relevance, duplication, and portability. | Episodic/Semantic Memory use cases and isolation experiments. | Stage 5 |
+| OQ-013 | How should Episodic Memory and Semantic Memory be promoted, retrieved, and reconciled with authoritative Knowledge? | Prevents stale experience or generated summaries from overriding source truth. | Stage 4 retrieval baseline and Stage 5 conflict fixtures. | Stage 5 |
 | OQ-014 | Which retrieval mix—structured queries, full text, semantic search, curated facts—is needed for MVP? | Avoids premature vector-store lock-in and measures grounding. | Representative corpus/query evaluation. | Stage 4 |
 | OQ-015 | Who may promote, edit, expire, or delete Memory Entries? | Memory can encode sensitive or false claims. | Persona controls, privacy requirements, poisoning tests. | Stage 5 |
 
@@ -48,7 +52,7 @@ These decisions are intentionally unresolved. “Target stage” indicates when 
 |---|---|---|---|---|
 | OQ-021 | Which implementation language best fits the core runtime and product team? | Determines ecosystem, contracts, deployment, and hiring. | Small type/state/async prototypes in TypeScript and/or Python; team constraints. | Stage 1 |
 | OQ-022 | How much runtime should be custom versus framework-based? | Balances control and speed against lock-in/hidden semantics. | Stage 2 conformance spike against actual runtime contract. | Stage 2 |
-| OQ-023 | When is a durable workflow system such as Temporal justified over a database queue? | Adds strong semantics and operational cost. | Timer, approval wait, replay, scale, and cancellation requirements. | Stage 1/6 |
+| OQ-023 | When is any production background queue or durable workflow system justified? | Temporal, Celery, BullMQ, Redis, or a database queue add different semantics and operational cost; Stage 1 needs none. | Timer, approval wait, replay, scale, and cancellation requirements from later runtime stages. | Stage 6 or later |
 | OQ-024 | Which model/provider capabilities are minimum requirements? | Adapters cannot erase real differences in schema, tools, context, and data policy. | Evaluation workload and provider policy comparison. | Stage 2/11 |
 | OQ-025 | Which parts must be separate services or workers at first production deployment? | Service splits should follow real isolation/scale needs. | Load/reliability tests and operational ownership. | Stage 13 |
 | OQ-026 | What recovery point/time and availability objectives are justified? | Determines storage, backup, and deployment costs. | Customer impact analysis and pilot expectations. | Stage 13 |

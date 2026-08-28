@@ -13,22 +13,31 @@ Stages are capability gates, not calendar estimates. A later stage begins only w
 - **Completion criteria:** requested artifacts exist, MVP and non-goals are explicit, unresolved decisions are recorded.
 - **Questions answered:** what problem, objects, principles, MVP slice, major risks, and next milestone.
 
-## Stage 1 — Application foundation and typed domain contracts
+## Stage 0.1 — Architecture refinement
 
-- **Objective:** create a minimal executable foundation without AI behavior.
-- **Build:** repository/tooling, configuration, module boundaries, core IDs/versioned schemas, Goal/Task/Execution state machines, persistence ports with in-memory adapter, command/query contracts, deterministic clocks/IDs, CI.
-- **Do not build:** model provider, agent loop, real tools, retrieval, memory, orchestration UI.
-- **Tests required:** schema compatibility, state transition tables, tenant-scope invariants, serialization, migration contract if persistence is selected.
-- **Completion criteria:** domain scenarios run deterministically; illegal transitions and cross-workspace references fail.
-- **Questions answered:** implementation language, module boundaries, validation approach, canonical state representation, initial persistence decision.
+- **Objective:** remove ambiguity from execution attempts, runtime records, Agent configuration identity, planning seams, Memory boundaries, and Stage 1 infrastructure scope.
+- **Build:** documentation decisions, explicit state models/invariants, ADR-002, ADR-003, and the refinement report.
+- **Do not build:** application code, AI/runtime behavior, Tool execution, Knowledge/Memory systems, orchestration, or infrastructure.
+- **Tests required:** terminology, link, diagram-fence, lifecycle/invariant, scope, and contradiction checks across documentation.
+- **Completion criteria:** ExecutionStep is removed from canonical vocabulary; TaskAttempt and AgentDefinitionVersion semantics are explicit; AgentRun persistence and planning strategy remain appropriately deferred; Stage 1 scope is deterministic and minimal.
+- **Questions answered:** attempt boundaries, current state versus transition/Event history, historical Agent configuration binding, and replaceable planning boundary.
+
+## Stage 1 — Deterministic Domain Foundation
+
+- **Objective:** create a minimal executable domain foundation that proves software guarantees without AI behavior.
+- **Build:** Workspace identity/scope, opaque IDs, versioned schemas, Goal lifecycle, Task lifecycle, TaskAttempt lifecycle, Execution lifecycle, explicit StateTransition history, a minimal versioned Event/audit envelope, deterministic clock/ID ports, optimistic concurrency/version guards, typed command/query boundaries, in-memory/test persistence adapters, workspace-isolation invariants, repository tooling, and CI. AgentDefinition and AgentDefinitionVersion may exist only as minimal type/reference concepts needed to prove immutable historical binding.
+- **Do not build:** LLM calls, model providers, AgentRun/reasoning loop, Action/Observation runtime families, Tool execution, RAG, embeddings, Memory system or generic memory fields, multi-agent communication, orchestration implementation, MCP, production background queues/workers, graph UI, autonomous actions, production database, event sourcing, CQRS, microservices, or agent frameworks.
+- **Tests required:** schema compatibility, complete legal/illegal state transition tables, Goal/Task/TaskAttempt/Execution terminal-state behavior, retry lineage, cancellation distinct from failure, optimistic concurrency conflicts, cross-workspace references, definition-version binding, Event/StateTransition append behavior, and serialization. Tests use deterministic clock/ID ports and in-memory adapters.
+- **Completion criteria:** domain scenarios run deterministically; illegal transitions, terminal-state reopening, stale-version writes, and cross-workspace references fail; retry creates a new TaskAttempt/Execution where required; no state alone claims an external side effect; CI passes without network or infrastructure services.
+- **Questions answered:** primary implementation language, project/module boundaries, validation approach, canonical lifecycle representation, concurrency guard contract, and minimum schema-versioning strategy. A database or infrastructure choice is not required; if introduced, it requires a separate evidence-based ADR.
 
 ## Stage 2 — Single-agent runtime
 
 - **Objective:** prove one bounded reasoning loop against a fake model.
-- **Build:** Agent Definition/version, invocation envelope, context contract, structured decision schema, model port and scripted double, limits, cancellation, terminal evaluation, traces.
+- **Build:** AgentDefinition/AgentDefinitionVersion behavior configuration, AgentRun and AgentInvocation contracts, context contract, initial typed model Action/Observation families, structured decision schema, model port and scripted double, limits, cancellation, terminal evaluation, and traces.
 - **Do not build:** live model required in CI, external tools, multi-agent delegation, durable workflow engine.
 - **Tests required:** malformed/refused/timed-out model output, limit exhaustion, no-progress loop, cancellation race, context overflow, deterministic golden scenarios.
-- **Completion criteria:** scripted agent completes, fails, times out, and escalates correctly with reproducible traces.
+- **Completion criteria:** a scripted AgentRun completes, fails with a categorized timeout where applicable, cancels, and escalates correctly with reproducible TaskAttempt and Execution traces bound to an exact AgentDefinitionVersion.
 - **Questions answered:** minimum runtime contract, decision types, error taxonomy, trace granularity, whether a focused library helps.
 
 ## Stage 3 — Tool system
@@ -61,10 +70,10 @@ Stages are capability gates, not calendar estimates. A later stage begins only w
 ## Stage 6 — Orchestration and delegation
 
 - **Objective:** convert Goals into bounded Tasks and coordinate the MVP agent team.
-- **Build:** planning/decomposition contract, dependency scheduling, eligibility selection, budgets, progress aggregation, handoff and escalation records.
+- **Build:** replaceable PlanningPort/Structured Plan contract, deterministic and agentic/hybrid strategy adapters as justified, domain validation of proposed plans, dependency scheduling, eligibility selection, budgets, progress aggregation, handoff and escalation records.
 - **Do not build:** unlimited recursive delegation, mandatory supervisor for every workflow, departments UI.
 - **Tests required:** cyclic dependency/handoff, partial failure, budget allocation, cancellation propagation, poor-plan fixtures, deterministic direct-workflow path.
-- **Completion criteria:** manager coordinates Research, Analyst, and Writer/Reporter on reference cases within bounds.
+- **Completion criteria:** at least two planning strategies can drive the same Goal/Task/TaskAttempt/Execution machinery; the chosen manager coordinates Research, Analyst, and Writer/Reporter on reference cases within bounds.
 - **Questions answered:** orchestrator identity, planning representation, routing criteria, task ownership.
 
 ## Stage 7 — Multi-agent communication
@@ -132,4 +141,4 @@ Stages are capability gates, not calendar estimates. A later stage begins only w
 
 ## Immediate next milestone
 
-Stage 1 should produce no AI feature claims. Its deliverable is a small executable domain core and CI suite that proves versioning, tenant scope, Goal/Task/Execution lifecycles, and adapter boundaries.
+Stage 1 should produce no AI feature claims. Its deliverable is a small executable deterministic domain core and CI suite proving Workspace isolation, versioned schemas, Goal/Task/TaskAttempt/Execution lifecycles, StateTransition/Event records, retry lineage, terminal-state rules, optimistic concurrency, and typed adapter boundaries. Use in-memory/test persistence unless an invariant genuinely requires more; do not begin Stage 2 automatically.

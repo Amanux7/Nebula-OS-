@@ -1,5 +1,7 @@
 # Stage 0 Completion Report
 
+> Stage 0.1 refines parts of this original completion record. For current execution and runtime identity semantics, see [Stage 0.1 Refinement Report](STAGE_0_1_REFINEMENT_REPORT.md), [ADR-002](architecture/ADR/ADR-002-execution-domain-semantics.md), and [ADR-003](architecture/ADR/ADR-003-agent-definition-and-runtime-identity.md).
+
 ## Outcome
 
 Stage 0 defines Agent Company OS as a governed operating layer for coordinated AI-assisted work. It establishes a narrow MVP, canonical language, conceptual runtime and data boundaries, permission and approval principles, quality strategies, major risks, and a capability-gated roadmap. It intentionally makes no application or technology-framework commitment.
@@ -76,8 +78,8 @@ The existing `LICENSE` is preserved unchanged.
 The largest unresolved questions are:
 
 - Which persona and workflow are the first commercial beachhead?
-- Should orchestration be agentic, deterministic, or hybrid?
-- Which language, persistence model, and durable job mechanism best fit Stage 1 requirements?
+- Which deterministic, agentic, or hybrid planning strategy should implement the replaceable PlanningPort for each workflow?
+- Which language and project/module structure best fit Stage 1? Production persistence and durable jobs remain later decisions unless a requirement demonstrates need.
 - How should Workflow graphs, definition activation/versioning, Skills, and handoff messages be represented?
 - What retrieval methods are necessary for the MVP corpus?
 - Who owns Memory, how is it promoted, and how does it yield to authoritative Knowledge?
@@ -96,17 +98,17 @@ A user creates a workspace, adds approved company/source material, and submits a
 
 ## Recommended Stage 1
 
-Build only the application foundation and typed domain contracts:
+Build only the Deterministic Domain Foundation:
 
 1. Choose the implementation language through a small, evidence-based ADR.
 2. Establish repository tooling, formatting, linting, type checking, tests, and CI.
 3. Implement opaque IDs, workspace scope, versioned schemas, and deterministic clock/ID ports.
-4. Implement pure Goal, Task, Execution, and Execution Step state machines with explicit terminal/failure states.
-5. Define command/query, persistence, policy, model, tool, and event ports; implement only in-memory/test adapters needed for domain scenarios.
-6. Add deterministic tests for schema compatibility, legal/illegal transitions, concurrency/version guards, and cross-workspace references.
+4. Implement pure Goal, Task, TaskAttempt, and Execution state machines plus explicit StateTransition history and a minimal Event/audit envelope. Do not implement a generic ExecutionStep.
+5. Define typed command/query, persistence, clock, and ID ports; implement only in-memory/test adapters needed for domain scenarios. AgentDefinitionVersion may be a reference-level concept, but AgentRun behavior remains out of scope.
+6. Add deterministic tests for schema compatibility, legal/illegal transitions, retry lineage, terminal history, concurrency/version guards, and cross-workspace references.
 7. Record persistence and module-boundary choices in ADRs when evidence is available.
 
-Stage 1 completion should demonstrate a deterministic, non-AI domain scenario and CI. It must not include an LLM call or claim an Agent Runtime exists.
+Stage 1 completion should demonstrate a deterministic, non-AI domain scenario and CI. It must not include an LLM call, AgentRun, Tool execution, Memory, orchestration, production background infrastructure, or claim an Agent Runtime exists.
 
 ## Explicitly not implemented
 

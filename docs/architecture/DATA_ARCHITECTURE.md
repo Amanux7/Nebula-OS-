@@ -7,7 +7,7 @@ Data categories have different consistency, access, lifecycle, size, query, and 
 | Category | Examples | Primary needs | Why it is distinct |
 |---|---|---|---|
 | Application data | Workspaces, users, memberships, definitions, policies, connections metadata | Transactions, relational integrity, versioning, tenant isolation | Canonical business configuration with strong consistency. |
-| Execution state | Goals, Tasks, Executions, steps, leases, approvals, idempotency records | State-machine integrity, concurrency control, durable recovery, high write rate | Mutable operational state; queues/caches cannot be its only record. |
+| Execution state | Goals, Tasks, TaskAttempts, Executions, current statuses, StateTransitions, approvals, and later Actions/Observations | State-machine integrity, concurrency control, retry lineage, and recovery | Distinct typed records; no generic ExecutionStep payload and no queue/cache as canonical state. |
 | Knowledge | Source metadata, normalized content, chunks, structured facts, provenance, indexes | Hybrid retrieval, source ACLs, freshness, deletion propagation | Persistent externally grounded information; indexes are derived. |
 | Memory | Scoped retained experiences, confidence, provenance, expiry, review status | Promotion rules, temporal queries, decay/retention, privacy | Derived from experience; not equivalent to knowledge or scratch state. |
 | Artifacts | Reports, drafts, exports, images/files | Large-object storage, content types, checksums, version/retention | Large immutable blobs are inefficient and risky in trace rows. |

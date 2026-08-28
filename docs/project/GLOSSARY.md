@@ -4,40 +4,51 @@ This file is the canonical terminology reference. Documents should link here rat
 
 | Term | Definition | Important distinction |
 |---|---|---|
-| Agent | A reasoning actor configured to pursue a Goal or Task within explicit context, tools, state, limits, and Policy. | Not a prompt, Tool, Skill, Workflow, model, or department. |
-| Agent Definition | Immutable versioned configuration describing an Agent's role, instructions, eligible capabilities, knowledge scopes, limits, autonomy ceiling, and evaluation profile. | Configuration, not a running process. |
-| Agent Instance | Runtime identity created from one Agent Definition version for an invocation/session boundary within an Execution. | Transient runtime actor, not reusable definition. |
+| Agent | A reasoning actor configured to pursue a Goal or Task within explicit Context, capabilities, Working State, limits, and Policy. | Conceptual actor, not a prompt, Tool, Skill, Workflow, model, or Department. |
+| AgentDefinition | Stable workspace-scoped logical identity and version lineage for an agent configuration. | Configuration identity, never active runtime participation. |
+| AgentDefinitionVersion | Immutable behavior configuration for an AgentDefinition, including versioned instructions and capability/Policy/model references. | The exact version—not a mutable active alias—is bound to history. |
+| AgentRun | Future bounded runtime participation of exactly one AgentDefinitionVersion for a TaskAttempt within an Execution. | Replaces `AgentInstance`; not implemented in Stage 1, and persistence form is deferred. |
+| AgentInvocation | Typed command/request that asks the runtime to start an AgentRun. | A command, not the runtime participant or the enclosing Execution. |
 | Skill | Reusable, versioned capability or procedure that describes how to perform a class of work and may compose Tools. | A Skill guides capability; a Tool executes an operation. |
 | Tool | Executable, typed interface to a deterministic capability or external system, governed by Tool Permissions. | Does not decide why/when it should run and never grants itself authority. |
 | Tool Definition | Versioned contract for a Tool operation, including schemas, risk/side-effect class, timeout/retry semantics, and required connection/scopes. | Definition, not a particular call. |
-| Task | Bounded unit of work with inputs, owner/assignee, acceptance criteria, dependencies, and lifecycle. | More concrete than a Goal; may have multiple Execution attempts. |
-| Goal | Desired outcome with constraints and acceptance criteria that may be decomposed into Tasks. | Outcome, not the plan or execution. |
+| Task | Bounded logical unit of work with inputs, acceptance criteria, dependencies, assignment, and lifecycle, belonging to exactly one Goal in the initial model. | Exists independently of its attempts and may have multiple TaskAttempts. |
+| TaskAttempt | One concrete attempt to perform exactly one Task within exactly one Execution. | Retry creates a new attempt and preserves terminated history. |
+| Goal | Desired outcome with constraints and acceptance criteria that may be decomposed into Tasks. | Outcome, not a plan, Task, attempt, or Execution; attempt failure does not automatically close it. |
 | Workflow | Versioned defined sequence or graph of deterministic and/or agentic steps. | Need not contain or be supervised by an Agent. |
-| Department | Organizational grouping for related Agent Definitions, defaults, responsibility, discovery, and reporting. | Not an execution boundary by itself and not necessarily hierarchical. |
-| Orchestrator | Component or future reasoning role that turns Goals into bounded Tasks and coordinates routing, dependencies, progress, and recovery. | Not required on every execution path. |
+| Department | Organizational grouping for related AgentDefinitions, defaults, responsibility, discovery, and reporting. | Not an execution boundary by itself and not necessarily hierarchical. |
+| Orchestrator | Component or future reasoning role that proposes or coordinates Tasks, routing, dependencies, progress, and recovery. | One replaceable strategy/role; it cannot bypass core domain validation and is not required on every path. |
+| PlanningPort | Provisional interface seam through which deterministic, agentic, or hybrid planning strategies propose a Structured Plan. | Core domain logic does not depend on a particular implementation. |
+| Structured Plan | Typed proposal describing Task decomposition, dependencies, routing, and constraints. | A proposal requiring software validation; it does not directly mutate state or grant authority. |
 | Supervisor | Agent or component that monitors and directs subordinate work in a particular orchestration pattern. | One possible Orchestrator pattern, not a universal architecture requirement. |
 | Handoff | Recorded transfer of Task responsibility and scoped context/artifact references from one actor to another. | Not free-form hidden agent chat. |
 | Delegation | Assignment of a bounded Task and authority to an eligible actor while the delegator retains coordination/accountability semantics. | Cannot widen permissions. |
-| Context | Bounded information assembled for one decision: task state, relevant Knowledge, scoped Memory, prior Observations, and eligible capability descriptions. | Temporary model input, not automatically persistent Knowledge or Memory. |
+| Context | Bounded information assembled for one decision from Working State, authorized Knowledge, explicitly scoped future Memory, relevant Conversation History, prior Observations, and eligible capabilities. | Temporary input, not automatically persistent Knowledge or Memory. |
 | Company Brain | Conceptual shared layer providing governed access to Knowledge, Memory, and relevant company state. | Not synonymous with RAG, embeddings, or one database. |
-| Knowledge | Persistent externally grounded information available with provenance, access, and freshness semantics. | Distinct from experience-derived Memory. |
+| Knowledge | Persistent internally or externally authoritative information available with provenance, access, and freshness semantics, such as company policies, product data, CRM records, and approved sources. | Distinct from agent-generated Memory and is not silently overridden by it. |
 | Knowledge Source | Governed origin of Knowledge such as a document, website, note, or structured integration dataset. | Source content remains authoritative over derived indexes. |
-| Memory | Governed retained information derived from prior experience/interactions, with scope, provenance, confidence, and retention. | Not execution scratch state, chat history, Knowledge, or vector search. |
-| Memory Entry | One persisted, lifecycle-managed unit of Memory. | Candidate memories require promotion/validation policy. |
-| State | Explicit current domain/runtime condition required to continue, recover, or inspect work. | Canonical state is not reconstructed solely from chat text or logs. |
-| Observation | Immutable, typed, sanitized fact returned by a model, Tool, retrieval, Policy, or system operation to the runtime. | It is untrusted input until validated; not necessarily truth or instruction. |
-| Execution | One concrete attempt to complete a Goal, Task, Workflow, Agent invocation, or operation. | Retrying creates/identifies a distinct attempt rather than erasing history. |
-| Execution Step | Atomic recorded action attempt or state transition within an Execution. | Provides retry/idempotency and trace granularity. |
+| Memory | Umbrella for future governed retention derived from experience; operational types, ownership, promotion, and retrieval remain deferred. | Not Working State, Conversation History, authoritative Knowledge, or vector search. |
+| Working State | Short-lived explicit runtime information required to continue the current Execution or TaskAttempt. | Deterministic current state, not long-term Memory. |
+| Conversation History | Recorded interaction history where relevant to a use case. | Not automatically Context or long-term Memory. |
+| Episodic Memory | Potential future retained record about a previous interaction, event, or Execution experience. | Experience-derived and scoped; not authoritative Knowledge. |
+| Semantic Memory | Potential future distilled/retrievable learned information derived from experiences. | Requires provenance, validation, conflict, and retention rules that are not yet decided. |
+| MemoryEntry | One future persisted, lifecycle-managed unit of Episodic or Semantic Memory. | Not a Stage 1 entity; candidate memories require later promotion/validation Policy. |
+| State | Explicit current domain/runtime condition required to continue, recover, or inspect work. | Canonical current state is not reconstructed solely from chat text, Events, or logs. |
+| Action | Typed requested operation selected by deterministic logic, Workflow logic, or an Agent. | A request—not a result, StateTransition, Event, or proof of external effect. |
+| Observation | Immutable typed information returned after an Action or external input, with provenance and trust classification. | Untrusted until validated; not automatically truth, instruction, or proof of success. |
+| StateTransition | Append-only record of an accepted lifecycle change, stored alongside the subject's canonical current status. | Explicit transition history without requiring event sourcing. |
+| Event | Append-only versioned record of a significant committed fact for audit, projection, or future integration. | Not a command, telemetry log, StateTransition, or automatic source of all application state. |
+| Execution | One bounded root attempt to satisfy a Goal, run a Workflow, or handle another typed top-level invocation. | May coordinate multiple TaskAttempts; terminal retry creates a linked Execution. |
 | Artifact | User-meaningful output such as a report, draft, or file linked to an Execution and stored by reference. | Not a verbose log payload. |
 | Policy | Versioned machine-enforceable rule governing access, behavior, budgets, autonomy, or required approval. | Instructions cannot override Policy. |
 | Permission | Effective authority for a principal/resource/action under Policy and current context. | Eligibility is not permission; grants can only be narrowed downstream. |
 | Approval | Recorded human decision about an exact proposed action, including its material payload, scope, policy context, and validity. | General trust or previous approval does not authorize a changed action. |
-| Approval Request | Pending lifecycle object that binds a proposed action to eligible approvers, risk, expiry, and payload digest. | An approved request is single-use and revalidated. |
+| Approval Request | Pending lifecycle object that binds an exact proposed Action to eligible approvers, risk, expiry, and payload digest. | An approved request is single-use and revalidated. |
 | Evaluation | Versioned assessment of behavior or output against explicit criteria, fixtures, references, or rubrics. | Not the same as a deterministic software test. |
 | Autonomy | Degree to which execution may proceed without human action, always bounded by Policy, permissions, resources, budgets, and escalation rules. | A maximum ceiling, not a guarantee the Agent acts. |
 | Connection | Workspace-scoped reference to an external system authorization and its granted scopes; secrets live behind a protected reference. | Not a Tool or blanket permission to every operation. |
 | Structured Decision | Schema-validated runtime output selecting an allowed action and carrying arguments, evidence references, and non-sensitive reason metadata. | Does not include or require hidden chain-of-thought. |
-| Execution Trace | Correlated structured record of versions, actions, observations, transitions, approvals, usage, errors, and outcomes. | Not canonical state by itself and not a chain-of-thought transcript. |
+| Execution Trace | Query/view that correlates TaskAttempts, AgentRuns, Actions, Observations, StateTransitions, Events, approvals, usage, errors, and outcomes. | A projection, not a generic ExecutionStep store, canonical state, or chain-of-thought transcript. |
 | Reason Category | Stable non-sensitive classification explaining why an action/state was selected (for example `insufficient_evidence` or `policy_requires_approval`). | Not verbatim private reasoning. |
 
 ## Autonomy levels

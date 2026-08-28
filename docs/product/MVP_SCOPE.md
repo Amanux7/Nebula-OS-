@@ -8,7 +8,7 @@ The MVP validates whether users can trust and benefit from a small, governed age
 
 - Workspace and user membership sufficient for isolation and ownership.
 - One manager/orchestrator plus three agents: Research, Analyst, and Writer/Reporter.
-- Versioned Agent Definitions, Skills, Tool Definitions, Goals, Tasks, and Executions.
+- Versioned AgentDefinitions/AgentDefinitionVersions, Skills, Tool Definitions, Goals, Tasks, TaskAttempts, and Executions.
 - A small, read-first tool registry (for example governed web/source retrieval and internal artifact access); any external write remains approval-gated.
 - Basic Company Brain ingestion and retrieval for a constrained set of text/document sources, with provenance and access control.
 - Bounded runtime with structured decisions, limits, cancellation, failure states, and deterministic provider doubles.
