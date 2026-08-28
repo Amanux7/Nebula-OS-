@@ -10,7 +10,7 @@ An authorization request is evaluated over:
 
 ```text
 principal + workspace + resource + action + purpose/task
-+ agent definition/version + tool/operation + connection
++ AgentDefinitionVersion + tool/operation + connection
 + autonomy level + data classification + limits + current state
 ```
 

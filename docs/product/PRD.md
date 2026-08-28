@@ -60,17 +60,17 @@ Candidate use cases include company research, lead intelligence, content plannin
 | Department | Organizational grouping and policy/visibility boundary for related agents. |
 | Skill | Reusable capability or procedure; it may guide reasoning or compose tools. |
 | Tool | Executable, typed interface to a deterministic capability or external system. |
-| Task | Bounded unit of work with acceptance criteria and lifecycle. |
+| Task | Bounded logical unit of work with acceptance criteria and lifecycle. |
 | Goal | Desired outcome that may be decomposed into tasks. |
 | Workflow | Versioned sequence or graph of deterministic and agentic steps. |
 | Knowledge Source | Governed source whose content can be retrieved with provenance. |
 | Memory | Retained information derived from experience and governed by scope and retention. |
-| Execution | One concrete attempt to perform a task, goal, workflow, or tool call. |
+| Execution | One bounded root attempt to satisfy a Goal, run a Workflow, or handle another typed top-level invocation. |
 | Policy | Machine-enforceable rule governing access or behavior. |
 | Approval | Recorded human decision authorizing, rejecting, or requesting changes to a proposed action. |
 | Evaluation | Recorded assessment of output or behavior against defined criteria. |
 
-Canonical definitions and lifecycles are in [Domain Model](../architecture/DOMAIN_MODEL.md) and [Glossary](../project/GLOSSARY.md).
+Canonical definitions and lifecycles are in [Domain Model](../architecture/DOMAIN_MODEL.md) and [Glossary](../project/GLOSSARY.md). Internally, TaskAttempt preserves retry history, while Action, Observation, StateTransition, and Event remain distinct runtime records rather than a generic ExecutionStep.
 
 ## 10. Company Brain
 
@@ -80,7 +80,7 @@ It is not synonymous with a vector database or RAG. Retrieval, structured querie
 
 ## 11. Agent system
 
-An Agent Definition specifies identity, role, instructions, capabilities, eligible tools and knowledge, default policies, and evaluation profile. An invocation creates runtime state for a particular goal or task. The runtime assembles authorized context, invokes a replaceable model through a typed boundary, validates a structured decision, chooses an allowed action, records observations and transitions, evaluates progress, and terminates, continues, or escalates within limits.
+An AgentDefinition is stable configuration identity; an immutable AgentDefinitionVersion specifies role, instructions, capabilities, eligible Tools and Knowledge, default Policies, model policy, and evaluation profile. A future AgentInvocation requests a bounded AgentRun for a TaskAttempt. Historical behavior binds the exact AgentDefinitionVersion so later changes do not reinterpret prior Executions. The future runtime assembles authorized Context, invokes a replaceable model through a typed boundary, validates a structured decision, creates an allowed Action, records Observations and StateTransitions, evaluates progress, and terminates, continues, or escalates within limits.
 
 Agents never receive unrestricted credentials. Their effective authority is the intersection of workspace, user, agent, task, tool, connection, and autonomy policies. No hidden chain-of-thought is required or stored.
 
@@ -135,7 +135,7 @@ The initial product will not provide dozens of placeholder agents, unrestricted 
 | ID | Requirement |
 |---|---|
 | FR-001 | A user can create a workspace with an isolated identity and configuration. |
-| FR-002 | A user can define, version, enable, disable, and inspect an Agent Definition. |
+| FR-002 | A user can define, version, enable, disable, and inspect an AgentDefinition and its AgentDefinitionVersions. |
 | FR-003 | The system can register versioned Skills separately from Agents and Tools. |
 | FR-004 | The system can register typed Tool Definitions with declared permissions and risk metadata. |
 | FR-005 | A user can add, remove, scope, and inspect Knowledge Sources with provenance. |
@@ -144,13 +144,13 @@ The initial product will not provide dozens of placeholder agents, unrestricted 
 | FR-008 | The system can invoke an eligible Agent for a Task using an immutable configuration version. |
 | FR-009 | The runtime can enforce iteration, time, token/cost, and tool-call limits. |
 | FR-010 | Model decisions and tool requests cross validated structured boundaries. |
-| FR-011 | Every execution and step has explicit state and terminal outcome. |
+| FR-011 | Every Goal, Task, TaskAttempt, and Execution follows an explicit lifecycle; Actions, Observations, StateTransitions, and Events use separate typed records. |
 | FR-012 | Policy is checked before privileged context access and tool execution. |
 | FR-013 | The system can create an Approval Request containing the exact proposed action. |
 | FR-014 | A user can approve, reject, edit-and-resubmit, cancel, or take over eligible work. |
 | FR-015 | Tool execution is idempotent where possible and records verifiable results. |
 | FR-016 | Users can inspect execution traces, source references, failures, retries, approvals, and evaluations. |
-| FR-017 | Users can cancel active executions and retry from a defined safe boundary. |
+| FR-017 | Users can cancel active Executions and retry from a defined safe boundary using a new linked Execution or TaskAttempt rather than rewriting terminal history. |
 | FR-018 | Artifacts are stored separately from trace metadata and linked to executions. |
 | FR-019 | The system supports deterministic workflows without requiring an agent supervisor. |
 | FR-020 | Authorization and workspace isolation apply to every product object and read/write path. |
