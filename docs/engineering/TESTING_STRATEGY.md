@@ -18,6 +18,21 @@ Tests protect domain invariants, tenant isolation, safe side effects, recoverabi
 
 ## Test layers
 
+### Implemented Stage 4 tests
+
+`tests/test_knowledge.py` adds 51 deterministic tests, backed by fictional sources in
+`tests/fixtures/knowledge/` and versioned `agent_eval/knowledge_cases.json`. The suite
+covers the requested A–T matrix: ingestion/chunking, exact source history, tenant/run
+isolation, grants/trust, disablement, conflicts, empty results, deterministic ranking,
+source/pack bounds, forged references, source/query injection, exact structured facts,
+free-text limitations, context eviction, and atomic source/pack publication failures.
+Additional checks cover stale commands, in-flight retrieval rejection, post-model
+revocation, wait/resume, query budgets, adapter poisoning, direct-store validation,
+and caller/tool provenance spoofing. Combined knowledge/tool evidence succeeds without
+network calls. The same CI commands run 206 total tests with no new dependencies.
+Exact local check results are in [Stage 4 report](../STAGE_4_REPORT.md); remote CI is
+not asserted. In-memory rollback is not crash recovery or distributed atomicity.
+
 ### Implemented Stage 3 tests
 
 `tests/test_tools.py` and `tests/fixtures/agent_eval/tool_cases.json` add deterministic

@@ -3,6 +3,7 @@
 from agent_company_os.domain.agent import ActionType, AgentRun
 from agent_company_os.domain.decisions import ModelDecision, ModelFailure
 from agent_company_os.domain.goal import Goal
+from agent_company_os.domain.knowledge import EvidencePack
 from agent_company_os.domain.task import Task
 from agent_company_os.domain.tools import ToolVersion
 from agent_company_os.ports.model import AgentModelRequest
@@ -10,7 +11,12 @@ from agent_company_os.ports.model import AgentModelRequest
 
 class ContextAssembler:
     def assemble(
-        self, run: AgentRun, goal: Goal, task: Task, tools: tuple[ToolVersion, ...] = ()
+        self,
+        run: AgentRun,
+        goal: Goal,
+        task: Task,
+        tools: tuple[ToolVersion, ...] = (),
+        knowledge: EvidencePack | None = None,
     ) -> AgentModelRequest:
         values = [
             goal.objective,
@@ -43,7 +49,10 @@ class ContextAssembler:
                     str(tool.definition.id),
                 )
             )
-        if sum(len(value) for value in values) > run.limits.max_context_chars:
+        if (
+            sum(len(value) for value in values) + (knowledge.context_chars if knowledge else 0)
+            > run.limits.max_context_chars
+        ):
             raise ModelFailure("context_overflow")
         return AgentModelRequest(
             run.definition_version,
@@ -57,6 +66,7 @@ class ContextAssembler:
             run.working_state.iteration,
             run.limits.max_iterations,
             available_tools=tools,
+            knowledge_evidence=knowledge,
         )
 
 
@@ -65,6 +75,8 @@ class ActionPolicy:
 
     @staticmethod
     def version_for(run: AgentRun) -> str:
+        if run.definition_version.knowledge_scope.source_ids:
+            return "bounded-knowledge-tools-v1"
         return (
             "read-only-tools-v1"
             if ActionType.CALL_TOOL in run.definition_version.allowed_actions

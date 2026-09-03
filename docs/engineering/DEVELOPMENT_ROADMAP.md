@@ -56,12 +56,13 @@ Stages are capability gates, not calendar estimates. A later stage begins only w
 
 ## Stage 4 — Knowledge / Company Brain
 
+- **Implemented status (2026-09-03):** offline Company Brain gate passed: 206 tests, including 51 knowledge cases. See [Stage 4 report](../STAGE_4_REPORT.md) and [ADR-007](../architecture/ADR/ADR-007-company-brain-and-knowledge-retrieval.md).
 - **Objective:** provide source-aware, authorized context for the reference workflow.
-- **Build:** constrained ingestion, provenance, source version/freshness, access enforcement, retrieval port, full-text/structured baseline, optional semantic experiment, citation contract.
-- **Do not build:** claim universal RAG, ingest every format, treat embeddings as truth, memory.
-- **Tests required:** ACL leakage, deletion propagation, stale/failed ingestion, citation validity, injection fixtures, retrieval quality baseline.
-- **Completion criteria:** reference corpus retrieval meets defined relevance/grounding targets and deletion/access tests.
-- **Questions answered:** minimum storage/index approach, retrieval mix, chunk/provenance model, freshness expectations.
+- **Built:** text/Markdown/typed-fact ingestion, immutable source versions/chunks, direct source grants, disablement, lexical-overlap retrieval, bounded EvidencePacks, exact structured-fact grounding, shared atomic in-memory adapter, and host-driven retrieval/runtime integration.
+- **Not built:** embeddings, live providers, generic document parsing, memory, automatic retrieval planning, semantic entailment, infrastructure, or hard deletion.
+- **Tests passed:** A–T source/history/scope/disablement/conflict/ranking/size/provenance/injection/context/rollback scenarios; combined tool and knowledge use. Scripted fixtures are not live-model quality scores.
+- **Completion criteria:** the requested deterministic baseline and disablement/access gate passes. ADR-007 explicitly defers the former broad semantic-quality and deletion-propagation targets pending real requirements.
+- **Questions answered:** lexical baseline, immutable provenance/pack model, latest active retrieval versus exact historical versions, direct source allowlists, internal capability seam. Production freshness and retention remain open.
 
 ## Stage 5 — Agent state and memory
 
@@ -146,8 +147,8 @@ Stages are capability gates, not calendar estimates. A later stage begins only w
 
 ## Immediate next milestone
 
-Stage 3 provides a controlled read-only tool boundary and receipt-grounded scripted
-scenarios. The next proposed milestone is Stage 4: Company Brain / Knowledge Retrieval,
-beginning with source-aware authorized context and a measured retrieval baseline.
-Stage 4 is not started automatically. Live-provider answer quality, durable storage,
+Stage 4 provides a bounded authorized retrieval baseline and immutable source evidence.
+The next proposed milestone is Stage 5: governed state and Memory, beginning with
+ownership, promotion/review, expiry, retention, and conflict-policy decisions.
+Stage 5 is not started automatically. Live-provider answer quality, durable storage,
 production readiness, and external write capability are not implied by this gate.

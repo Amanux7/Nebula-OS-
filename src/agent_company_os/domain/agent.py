@@ -14,6 +14,7 @@ from agent_company_os.domain.ids import (
     Version,
     WorkspaceId,
 )
+from agent_company_os.domain.knowledge import EvidencePackId, KnowledgeScope
 from agent_company_os.domain.tools import ToolGrant, ToolObservationData
 from agent_company_os.domain.validation import clean_required_text, require_utc
 
@@ -59,8 +60,11 @@ class AgentDefinitionVersion:
     model_name: str = "scripted-v1"
     schema_version: int = 1
     allowed_tools: tuple[ToolGrant, ...] = ()
+    knowledge_scope: KnowledgeScope = KnowledgeScope()
 
     def __post_init__(self) -> None:
+        if not isinstance(self.knowledge_scope, KnowledgeScope):
+            raise InvariantViolation("knowledge_scope_type")
         if (
             not isinstance(self.allowed_tools, tuple)
             or len(self.allowed_tools) > 3
@@ -128,8 +132,10 @@ class SuppliedContext:
     source_texts: tuple[SourceText, ...] = ()
 
     def __post_init__(self) -> None:
-        if any(fact.source_id.startswith("tool_receipt:") for fact in self.facts):
+        if any(fact.source_id.startswith(("tool_receipt:", "knowledge:")) for fact in self.facts):
             raise InvariantViolation("supplied_sources_cannot_impersonate_tool_receipts")
+        if any(s.source_id.startswith(("tool_receipt:", "knowledge:")) for s in self.source_texts):
+            raise InvariantViolation("supplied_sources_cannot_impersonate_runtime_evidence")
         if not self.required_keys or len(set(self.required_keys)) != len(self.required_keys):
             raise InvariantViolation("required_fact_keys_unique_nonempty")
         if any(
@@ -192,6 +198,7 @@ class AgentWorkingState:
     observations: tuple[Observation, ...] = ()
     missing_fields: tuple[str, ...] = ()
     invocation_pending: bool = False
+    active_evidence_pack_id: EvidencePackId | None = None
 
     def __post_init__(self) -> None:
         if (

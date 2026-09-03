@@ -2,6 +2,29 @@
 
 These decisions are intentionally unresolved. “Target stage” indicates when evidence is expected, not a deadline to decide prematurely.
 
+## Stage 4 decision updates
+
+- OQ-014: ADR-007 selects bounded lexical-overlap retrieval over text/Markdown/typed
+  facts as the offline baseline. Semantic/hybrid retrieval needs corpus/query evidence.
+- OQ-029: retrieval is an internal host capability, not a new model Action or tool.
+  Exact EvidencePacks enter a dedicated model-context field. Agent query selection is deferred.
+- OQ-030/033: source/query/pack Events and immutable packs now preserve accepted
+  knowledge evidence after context replacement. Durability, deletion/redaction,
+  retention, and complete caller-context history remain unresolved.
+- OQ-034: exact source versions and timestamps plus deterministic conflict-gap tests
+  now exist. Business freshness, conflict adjudication, semantic grounding, and live
+  tool/knowledge-selection quality are still open.
+- OQ-036: direct source/trust grants, scope checks, and in-process revocation rechecks
+  are implemented. Authenticated publisher/reader identities and production policy
+  linearization are not solved by the trusted host test adapter.
+- OQ-012/013/015: Memory ownership, promotion/review, expiry, deletion, and precedence
+  remain Stage 5 questions. ToolReceipts and EvidencePacks are not automatically Memory.
+
+New questions: what scale justifies an index/database beyond the 100-source workspace
+cap; what effective dates/refresh rules define stale knowledge; which free-text
+entailment evaluator is sufficiently calibrated; and when an agent-requested retrieval
+action earns its added policy and evaluation surface. No new infrastructure is selected.
+
 ## Stage 3 decision updates
 
 The inventory below preserves the original questions; these explicit resolutions

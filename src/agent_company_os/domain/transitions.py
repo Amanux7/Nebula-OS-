@@ -11,6 +11,7 @@ from agent_company_os.domain.validation import clean_required_text, require_utc
 
 
 class SubjectType(StrEnum):
+    KNOWLEDGE_SOURCE = "knowledge_source"
     AGENT_RUN = "agent_run"
     GOAL = "goal"
     TASK = "task"

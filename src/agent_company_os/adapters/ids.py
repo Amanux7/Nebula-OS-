@@ -13,10 +13,17 @@ from agent_company_os.domain.ids import (
     TaskId,
     WorkspaceId,
 )
+from agent_company_os.domain.knowledge import EvidencePackId, KnowledgeSourceId
 from agent_company_os.domain.tools import ToolInvocationId, ToolReceiptId
 
 
 class SystemIdGenerator:
+    def knowledge_source_id(self) -> KnowledgeSourceId:
+        return KnowledgeSourceId(str(uuid4()))
+
+    def evidence_pack_id(self) -> EvidencePackId:
+        return EvidencePackId(str(uuid4()))
+
     def tool_invocation_id(self) -> ToolInvocationId:
         return ToolInvocationId(str(uuid4()))
 
@@ -55,6 +62,12 @@ class SystemIdGenerator:
 
 
 class DeterministicIdGenerator:
+    def knowledge_source_id(self) -> KnowledgeSourceId:
+        return KnowledgeSourceId(self._next("knowledge-source"))
+
+    def evidence_pack_id(self) -> EvidencePackId:
+        return EvidencePackId(self._next("evidence-pack"))
+
     def tool_invocation_id(self) -> ToolInvocationId:
         return ToolInvocationId(self._next("tool-invocation"))
 

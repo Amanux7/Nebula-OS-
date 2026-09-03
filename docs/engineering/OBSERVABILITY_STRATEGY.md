@@ -6,6 +6,24 @@ Observability must let users and operators answer: what ran, under which version
 
 ## Correlation model
 
+### Implemented Stage 4 evidence
+
+Knowledge source publication and disablement create KnowledgeSource-subject Events.
+knowledge_query_executed, knowledge_query_rejected, and evidence_pack_created use
+AgentRun subjects and bind workspace, Execution, TaskAttempt, definition version,
+and EvidencePack where applicable. Query metadata records length, strategy/version,
+matched/returned counts, source count/versions, duration_ms, evidence_chars, and
+truncation. Evidence characters count serialized candidates; the pack's full export
+also includes bounded query/envelope metadata and has its own enforced character cap.
+
+Source Events carry content version/hash and chunk count, never document bodies.
+Rejected requests record normalized error codes, not raw exception or query text.
+The exact query and accepted evidence remain separately access-controlled in immutable
+packs; `serialize_pack` exports them and `serialize_run` links the active pack ID.
+There is no telemetry backend, export service, retention policy, or tamper-proof audit
+store. Historical packs are not Memory and do not imply that the model used every
+candidate. See [Stage 4 report](../STAGE_4_REPORT.md).
+
 ### Implemented Stage 3 evidence
 
 RuntimeStore now records `tool_invocation_started`, `tool_request_rejected`,

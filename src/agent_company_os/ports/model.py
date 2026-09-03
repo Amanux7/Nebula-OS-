@@ -9,6 +9,7 @@ from agent_company_os.domain.agent import (
     Observation,
     SuppliedContext,
 )
+from agent_company_os.domain.knowledge import EvidencePack
 from agent_company_os.domain.tools import ToolVersion
 
 
@@ -26,6 +27,7 @@ class AgentModelRequest:
     max_iterations: int
     schema_version: int = 1
     available_tools: tuple[ToolVersion, ...] = ()
+    knowledge_evidence: EvidencePack | None = None
 
 
 class ModelPort(Protocol):

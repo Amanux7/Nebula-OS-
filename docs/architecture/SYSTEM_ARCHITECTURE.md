@@ -2,6 +2,18 @@
 
 ## Purpose and constraints
 
+### Implemented Stage 4 boundary
+
+[ADR-007](ADR/ADR-007-company-brain-and-knowledge-retrieval.md) adds KnowledgeService
+as a host-invoked application capability, separate from ToolRuntimeService.
+KnowledgeIngestor normalizes bounded sources, KnowledgeRetriever ranks authorized
+chunks, and KnowledgeStore preserves versions/packs. AgentRuntimeService depends
+only on KnowledgeRuntimePort for active evidence; ContextAssembler exposes a
+separate knowledge_evidence field. The in-memory knowledge adapter shares the
+runtime transaction lock and rollback boundary. No model-requested retrieval action,
+orchestrator, vector store, queue, service deployment, or Memory implementation is added.
+The diagrams below remain target architecture, not a list of deployed services.
+
 This document defines logical responsibilities and dependency direction before technology selection. The architecture must support explicit execution state, policy enforcement, provider replaceability, durable long-running work, and evidence-backed outcomes. It does not prescribe deployable services; several layers may begin in one modular application.
 
 ## Context

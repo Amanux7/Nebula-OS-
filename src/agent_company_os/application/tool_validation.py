@@ -108,7 +108,7 @@ def validate_output(raw: str, version: ToolVersion, request: ToolInput) -> ToolO
             _text(fields["value"], 512, code),
             _text(fields["source_id"], 128, code),
         )
-        if fact.source_id.startswith("tool_receipt:"):
+        if fact.source_id.startswith(("tool_receipt:", "knowledge:")):
             raise ToolFailure(code)
         if isinstance(request, SourceLookupInput) and (
             fact.key not in request.keys or fact.source_id != request.source_id

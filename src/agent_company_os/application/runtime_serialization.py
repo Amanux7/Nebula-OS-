@@ -36,5 +36,8 @@ def serialize_run(run: AgentRun) -> dict[str, object]:
         "iteration": run.working_state.iteration,
         "error_code": run.error_code,
         "missing_fields": list(run.working_state.missing_fields),
+        "active_evidence_pack_id": str(run.working_state.active_evidence_pack_id)
+        if run.working_state.active_evidence_pack_id
+        else None,
         "result": result,
     }

@@ -1,5 +1,22 @@
 # Domain Model
 
+## Stage 4 implemented knowledge extension
+
+The existing Goal/Task/TaskAttempt/Execution/AgentRun semantics are unchanged.
+[ADR-007](ADR/ADR-007-company-brain-and-knowledge-retrieval.md) adds KnowledgeSource
+(workspace-scoped stable identity with active/disabled state), immutable
+KnowledgeSourceVersion and KnowledgeChunk, explicit KnowledgeScope on immutable agent
+configuration, and immutable workspace/run-bound EvidencePack. Source content version
+is distinct from its optimistic status/mutation Version. KnowledgeQuery and ranked
+EvidenceCandidate are typed value contracts, not Actions, Tasks, or generic steps.
+
+Source/chunk lineage cannot cross workspaces; updates append versions, never overwrite
+history. New retrieval uses active/latest permitted versions, while historical pack
+reads preserve exact versions. Grounding requires exact structured-fact membership in
+the active authorized pack. Disablement revokes use without erasing audit. Source and
+pack state/audit commit atomically; a domain transition never claims an external action
+occurred. Knowledge data cannot change agent grants, and learned Memory is not added.
+
 ## Modeling rules
 
 - Every workspace-owned entity carries a `workspace_id`; cross-workspace references are invalid.
