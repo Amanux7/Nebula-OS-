@@ -169,9 +169,10 @@ def validate_brief(
     proposal: CompleteTask,
     context: SuppliedContext,
     tool_evidence: tuple[Fact, ...] = (),
+    knowledge_evidence: tuple[Fact, ...] = (),
 ) -> ResearchBrief:
     """Exact supplied fact matching, not a general natural-language truth oracle."""
-    evidence = (*context.facts, *tool_evidence)
+    evidence = (*context.facts, *tool_evidence, *knowledge_evidence)
     expected_gaps = {
         key
         for key in context.required_keys

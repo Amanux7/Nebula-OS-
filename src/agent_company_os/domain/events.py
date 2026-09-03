@@ -13,6 +13,11 @@ from agent_company_os.domain.validation import clean_required_text, require_utc
 
 
 class EventType(StrEnum):
+    KNOWLEDGE_SOURCE_PUBLISHED = "knowledge_source_published"
+    KNOWLEDGE_SOURCE_DISABLED = "knowledge_source_disabled"
+    KNOWLEDGE_QUERY_EXECUTED = "knowledge_query_executed"
+    KNOWLEDGE_QUERY_REJECTED = "knowledge_query_rejected"
+    EVIDENCE_PACK_CREATED = "evidence_pack_created"
     TOOL_INVOCATION_STARTED = "tool_invocation_started"
     TOOL_REQUEST_REJECTED = "tool_request_rejected"
     TOOL_RECEIPT_RECORDED = "tool_receipt_recorded"

@@ -2,6 +2,25 @@
 
 This file is the canonical terminology reference. Documents should link here rather than invent local synonyms.
 
+## Stage 4 precise knowledge vocabulary
+
+| Term | Definition | Important distinction |
+|---|---|---|
+| KnowledgeSource | Stable workspace-scoped source identity, name, format, trust, and active/disabled state. | Current source mutation Version is separate from content Version. |
+| KnowledgeSourceVersion | Immutable normalized content/hash, typed facts, metadata, timestamp, algorithms, and limits. | New publication appends a version; history never resolves through latest. |
+| KnowledgeChunk | Immutable deterministic piece of an exact source version with ordinal, hash, and provenance. | Text projection, not learned information or an execution step. |
+| KnowledgeScope | Immutable source ID and trust allowlists on AgentDefinitionVersion. | Query filters narrow but never expand grants. Collections are deferred. |
+| KnowledgeQuery | Typed workspace/text/filter/limit request from trusted host code. | Query text is untrusted data, not executable policy. |
+| EvidenceCandidate | A ranked chunk snapshot with exact provenance, declared trust, source-version timestamp, and score. | Relevance, trust, and freshness are independent. |
+| EvidencePack | Immutable workspace/run-bound record of the exact bounded retrieval result and query/strategy. | Separate from active working state, supplied context, ToolReceipt, and Memory. |
+| KnowledgeService | Application capability for publishing/disabling sources and retrieving/reading packs. | Not a ToolRuntime, planner, agent persona, or vector database. |
+
+Stage 4 Company Brain implements governed source access and retrieval only. Working
+State, Conversation History, Episodic/Semantic Memory, and authoritative Knowledge
+remain distinct; no experience-derived Memory or automatic promotion is implemented.
+
+## Shared product vocabulary
+
 | Term | Definition | Important distinction |
 |---|---|---|
 | Agent | A reasoning actor configured to pursue a Goal or Task within explicit Context, capabilities, Working State, limits, and Policy. | Conceptual actor, not a prompt, Tool, Skill, Workflow, model, or Department. |

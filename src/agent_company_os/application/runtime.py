@@ -41,6 +41,7 @@ from agent_company_os.domain.task_attempt import TaskAttempt, TaskAttemptStatus
 from agent_company_os.domain.transitions import StateTransition, SubjectType
 from agent_company_os.ports.clock import Clock
 from agent_company_os.ports.ids import IdGenerator
+from agent_company_os.ports.knowledge import KnowledgeRuntimePort
 from agent_company_os.ports.model import ModelPort
 from agent_company_os.ports.runtime_store import RuntimeStore
 from agent_company_os.ports.tools import ToolRuntimePort
@@ -66,12 +67,14 @@ class AgentRuntimeService:
         ids: IdGenerator,
         model: ModelPort,
         tools: ToolRuntimePort | None = None,
+        knowledge: KnowledgeRuntimePort | None = None,
     ) -> None:
         self.store = store
         self.clock = clock
         self.ids = ids
         self.model = model
         self.tools = tools
+        self.knowledge = knowledge
         self.domain = DomainService(store.domain, clock, ids)
         self.assembler = ContextAssembler()
         self.policy = ActionPolicy()
@@ -104,13 +107,19 @@ class AgentRuntimeService:
                 context,
                 self.clock.now(),
                 self.clock.now() + timedelta(seconds=limits.execution_seconds),
-                runtime_protocol="single-agent-tools-v1"
+                runtime_protocol="single-agent-knowledge-v1"
+                if definition.knowledge_scope.source_ids
+                else "single-agent-tools-v1"
                 if ActionType.CALL_TOOL in definition.allowed_actions
                 else "single-agent-v1",
-                policy_version="read-only-tools-v1"
+                policy_version="bounded-knowledge-tools-v1"
+                if definition.knowledge_scope.source_ids
+                else "read-only-tools-v1"
                 if ActionType.CALL_TOOL in definition.allowed_actions
                 else "internal-actions-v1",
-                evaluator_version="receipt-facts-v1"
+                evaluator_version="knowledge-facts-v1"
+                if definition.knowledge_scope.source_ids
+                else "receipt-facts-v1"
                 if ActionType.CALL_TOOL in definition.allowed_actions
                 else "supplied-facts-v1",
             )
@@ -178,16 +187,34 @@ class AgentRuntimeService:
                     if self.model.model_name != run.definition_version.model_name:
                         raise InvariantViolation("model_binding_changed")
                     tool_enabled = ActionType.CALL_TOOL in run.definition_version.allowed_actions
+                    knowledge_enabled = bool(run.definition_version.knowledge_scope.source_ids)
                     if (
                         run.policy_version != self.policy.version_for(run)
                         or run.runtime_protocol
-                        != ("single-agent-tools-v1" if tool_enabled else "single-agent-v1")
+                        != (
+                            "single-agent-knowledge-v1"
+                            if knowledge_enabled
+                            else "single-agent-tools-v1"
+                            if tool_enabled
+                            else "single-agent-v1"
+                        )
                         or run.evaluator_version
-                        != ("receipt-facts-v1" if tool_enabled else "supplied-facts-v1")
+                        != (
+                            "knowledge-facts-v1"
+                            if knowledge_enabled
+                            else "receipt-facts-v1"
+                            if tool_enabled
+                            else "supplied-facts-v1"
+                        )
                     ):
                         raise InvariantViolation("runtime_configuration_version_changed")
                     if run.working_state.invocation_pending:
                         raise InvariantViolation("duplicate_invocation")
+                    if (
+                        run.working_state.active_evidence_pack_id is not None
+                        and self.knowledge is None
+                    ):
+                        raise InvariantViolation("knowledge_adapter_required")
                     state = replace(
                         run.working_state,
                         iteration=run.working_state.iteration + 1,
@@ -200,6 +227,7 @@ class AgentRuntimeService:
                         snapshot.goal,
                         snapshot.task,
                         self.tools.descriptors(claimed) if self.tools else (),
+                        self.knowledge.active_pack(claimed) if self.knowledge else None,
                     )
                     started = self.clock.now()
                 # Never hold a store lock across a model call. Adapter is cooperative async.
@@ -219,6 +247,8 @@ class AgentRuntimeService:
                         current = self.store.get_run(workspace_id, run_id)
                         self._version(current, claimed.version)
                         self._deadline(current)
+                        if self.knowledge:
+                            self.knowledge.active_pack(current)
                         if self._parents(current).versions != snapshot.versions:
                             raise ModelFailure("version_conflict")
                         self.policy.authorize(current, decision)
@@ -246,6 +276,8 @@ class AgentRuntimeService:
                     current = self.store.get_run(workspace_id, run_id)
                     self._version(current, claimed.version)
                     self._deadline(current)
+                    if self.knowledge:
+                        self.knowledge.active_pack(current)
                     versions = (
                         self.store.domain.get_goal(current.goal_id).version,
                         self.store.domain.get_task(current.task_id).version,
@@ -285,6 +317,7 @@ class AgentRuntimeService:
                             decision.payload,
                             current.context,
                             self.tools.evidence(current) if self.tools else (),
+                            self.knowledge.evidence(current) if self.knowledge else (),
                         )
                         attempt = self.domain.succeed_task_attempt(
                             latest.attempt.id, latest.attempt.version

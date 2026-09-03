@@ -1,5 +1,29 @@
 # Data Architecture
 
+## Implemented Stage 4 knowledge records
+
+Company Brain is the logical source-governance/retrieval capability, not a vector
+database. KnowledgeSource owns identity/scope/type/trust/current content version and
+active/disabled status. KnowledgeSourceVersion snapshots normalized content/hash,
+typed facts, source metadata, ingestion timestamp, algorithms, and limits. KnowledgeChunk
+is a deterministic immutable projection of that exact version, with ordinal/hash and
+source binding. EvidencePack records exactly the bounded selected chunks and metadata,
+query/filter/limits, strategy version, workspace/run, and capture time.
+
+Canonical sources and chunks are published atomically. Packs, active run references,
+and Events share a rollback boundary through InMemoryKnowledgeStore/RuntimeStore.
+The lexical index is a bounded scan of authorized current-version chunks; no separate
+database/index infrastructure is selected. New retrieval selects active/latest versions;
+historical reads select exact versions, including disabled-source evidence. Disablement
+prevents new model use but does not delete history. Actual retention, redaction, and
+deletion propagation are deferred. Everything is lost on process exit.
+
+Working state, conversation history, learned Memory, ToolReceipts, supplied context,
+and authoritative Knowledge remain distinct. No runtime output is promoted into a
+source. See [ADR-007](ADR/ADR-007-company-brain-and-knowledge-retrieval.md) for bounds,
+content hashing, provenance, and the narrower Stage 4 gate; future flows below are
+not claims of implemented outboxes, artifact stores, or semantic search.
+
 ## Principle
 
 Data categories have different consistency, access, lifecycle, size, query, and security needs. A single physical store may serve several categories initially, but their logical contracts and retention policies remain separate.

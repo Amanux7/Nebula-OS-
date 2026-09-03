@@ -43,6 +43,25 @@ No live-model quality or universal hallucination/injection protection is claimed
 
 ## Runtime vocabulary
 
+### Implemented Stage 4 extension
+
+[ADR-007](ADR/ADR-007-company-brain-and-knowledge-retrieval.md) adds explicit host
+retrieval before model invocation, or after normal wait/resume. The four existing
+Actions are unchanged. KnowledgeScope is immutable AgentDefinitionVersion configuration;
+working state carries only active_evidence_pack_id. KnowledgeRuntimePort supplies the
+authorized exact pack separately from supplied context and tool Observations.
+Knowledge-enabled runs pin single-agent-knowledge-v1 / bounded-knowledge-tools-v1 /
+knowledge-facts-v1; earlier versions retain their previous semantic identities.
+
+The host query cannot widen source/trust grants. Retrieval requires an idle running
+run, active parents, current version, remaining deadline, and fewer than five packs.
+The serialized pack and all descriptive metadata count against context limits.
+Before and after model I/O, active pack evidence is rechecked for permission and
+source disablement. New source versions do not rewrite prior packs. Only active-pack
+exact structured facts enter completion grounding; retained free text is not an
+entailment oracle. Evicted packs remain audit evidence, not automatic long-term Memory.
+Source/pack publication is atomic with its state/audit; retrieval never executes a tool.
+
 ### Implemented Stage 3 extension
 
 [ADR-006](ADR/ADR-006-tool-runtime.md) adds exactly `call_tool`. ToolRuntimeService,
@@ -226,6 +245,7 @@ Future model adapters, context retrievers, memory providers, tool adapters, poli
 - **Stage 1:** deterministic Workspace, Goal, Task, TaskAttempt, Execution, StateTransition, minimal Event envelope, typed boundaries, and in-memory/test adapters only.
 - **Stage 2:** one AgentRun loop against a deterministic model double; exact Action/Observation contracts needed for model invocation.
 - **Stage 3:** read-only fixture tools, exact grants, ToolInvocation/ToolReceipt evidence, bounded Observations, and receipt grounding.
-- **Later stages:** Knowledge retrieval, Memory, replaceable orchestration, external integrations/writes, and multi-agent communication.
+- **Stage 4:** authorized lexical Knowledge retrieval, immutable sources/chunks/EvidencePacks, and structured-fact grounding.
+- **Later stages:** Memory, replaceable orchestration, external integrations/writes, and multi-agent communication.
 
 See [Development Roadmap](../engineering/DEVELOPMENT_ROADMAP.md), [ADR-002](ADR/ADR-002-execution-domain-semantics.md), and [ADR-003](ADR/ADR-003-agent-definition-and-runtime-identity.md).

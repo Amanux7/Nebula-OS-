@@ -11,9 +11,10 @@ scoped capabilities, and evidence behind every accepted result.
 
 > **AI for judgment. Software for guarantees.**
 
-**Current milestone: Stage 3 — Tool Runtime.** The repository implements a
+**Current milestone: Stage 4 — Company Brain / Knowledge Retrieval.** The repository implements a
 deterministic domain foundation, a single-agent loop driven by a scripted model,
-and two read-only fixture tools. It is an early-stage engineering foundation,
+two read-only fixture tools, and bounded, source-aware knowledge retrieval.
+It is an early-stage engineering foundation,
 not a deployed autonomous company or a production-ready AI service.
 
 [Get started](#getting-started) · [Architecture](#architecture) ·
@@ -71,18 +72,21 @@ cannot grant permissions, bypass domain invariants, or certify its own success.
 | Single-agent runtime | Structured decisions, bounded working state, wait/resume, cancellation, and a scripted FakeModel |
 | Controlled tools | Exact-version registry, explicit grants, read-only risk enforcement, strict inputs and outputs |
 | Execution evidence | Immutable ToolReceipts, typed Observations, audit Events, and explicit receipt export |
-| Grounded completion | Exact findings checked against supplied facts or successful same-run tool evidence |
+| Company Brain | Versioned text/Markdown/structured facts, source grants, lexical retrieval, and immutable EvidencePacks |
+| Grounded completion | Exact findings checked against supplied facts, successful tool receipts, or active same-run knowledge evidence |
 | Failure handling | Timeouts, budgets, duplicate-invocation protection, stale-result rejection, and atomic rollback |
-| Verification | 155 passing tests at the Stage 3 gate, plus formatting, lint, and strict type checks |
+| Verification | 206 passing tests at the Stage 4 gate, plus formatting, lint, and strict type checks |
 
 The only supplied agent type is the **Research Brief Agent**. It can operate on
 approved supplied facts or receive an immutable definition upgrade granting the
-two fixture tools. Its model responses are scripted; no live LLM provider is wired in.
+two fixture tools and/or a fixed knowledge-source allowlist. Its model responses are
+scripted; no live LLM provider is wired in.
 
 ## Architecture
 
 The implemented architecture is a **modular Python application**, not a microservice
-deployment. The diagram shows logical responsibilities and adapter boundaries.
+deployment. The diagram shows the Stage 1–3 core; the Stage 4 knowledge boundary
+is described immediately below it. These are logical responsibilities, not services.
 
 ~~~mermaid
 flowchart TD
@@ -111,8 +115,28 @@ AgentRuntimeService coordinates decisions; ToolRuntimeService controls capabilit
 Neither model text nor tool-returned content becomes an authority boundary.
 Canonical state is stored directly, with append-only history—it is **not event sourcing**.
 
+### Company Brain boundary
+
+The host calls `KnowledgeService` to publish approved source versions, disable sources,
+or retrieve a bounded EvidencePack for an idle AgentRun. `KnowledgeIngestor`,
+`KnowledgeRetriever`, and `KnowledgeStore` separate ingestion, ranking, and persistence.
+The runtime reads authorized packs through `KnowledgeRuntimePort`; retrieval is not
+registered as a tool and does not add another agent action or planner.
+
+Publication produces immutable normalized source versions and deterministic chunks.
+Source grants and trust filters are applied before lexical ranking. The exact returned
+chunks, versions, hashes, trust labels, query, and strategy become an immutable pack.
+Context assembly keeps it separate from supplied data and tool Observations. Model
+completion must cite exact structured facts from the active same-run pack; free-text
+paraphrases are not treated as verified facts. Replacing context does not erase history.
+
+Default bounds: 32 KiB/source, 800 characters/chunk, 5 candidates/query, a 4,000-character
+serialized pack, 2 candidates/source, and 5 packs/run. The existing total context cap
+still applies. See [ADR-007](docs/architecture/ADR/ADR-007-company-brain-and-knowledge-retrieval.md)
+for all hard limits, historical-version policy, revocation, and grounding limitations.
+
 The [System Architecture](docs/architecture/SYSTEM_ARCHITECTURE.md) describes the
-broader target design. Its UI, planning, knowledge, memory, and infrastructure layers
+broader target design. Its UI, planning, memory, and production infrastructure layers
 must not be mistaken for implemented services.
 
 ### Domain vocabulary
@@ -261,11 +285,16 @@ lint, type checking, and tests on pushes and pull requests. The test phase is of
 and secret-free; dependency installation still uses package downloads. The CI badge
 above tracks `main`, not unmerged pull-request branches.
 
-The [Stage 3 report](docs/STAGE_3_REPORT.md) records **155 passing tests**:
-87 existing tests and 68 Stage 3 cases. Coverage includes malformed inputs/outputs,
+The [Stage 4 report](docs/STAGE_4_REPORT.md) records **206 passing tests**:
+155 existing tests and 51 Stage 4 cases. Coverage includes malformed inputs/outputs,
 permission denials, foreign-workspace references, forged provenance, injection
 attempts, budgets, cancellation races, stale versions, and claim/result rollback.
 Passing scripted tests establishes software behavior—not live-model answer quality.
+
+Run the Company Brain scenarios alone with `python -m pytest tests/test_knowledge.py -q`.
+The fictional Aurora Desk corpus demonstrates missing-context recovery, version updates,
+conflicting prices, unauthorized sources, injected instructions, forged references,
+bounded retrieval, and combined knowledge/tool evidence without network calls.
 
 ## Repository structure
 
@@ -300,7 +329,7 @@ Passing scripted tests establishes software behavior—not live-model answer qua
 | 1 | Deterministic domain foundation | Implemented and verified |
 | 2 | Single-agent runtime | Verified with a scripted model |
 | 3 | Controlled read-only Tool Runtime | Implemented and verified offline |
-| 4 | Company Brain / Knowledge Retrieval | Next proposed milestone; not started |
+| 4 | Company Brain / Knowledge Retrieval | Implemented and verified offline |
 | 5 | Governed state and memory | Planned |
 | 6–9 | Orchestration, communication, organization, and human approval | Planned |
 | 10–13 | Observability UI, evaluation hardening, integrations, and production | Planned |
@@ -314,8 +343,8 @@ See the [Development Roadmap](docs/engineering/DEVELOPMENT_ROADMAP.md).
 - **No external writes:** no email, Slack, database mutation, shell, filesystem,
   browser, payment, or purchase tools are implemented.
 - **No live AI or integrations:** no live model provider, OAuth connector, or MCP runtime.
-- **No knowledge or memory system yet:** no RAG, embeddings, Company Brain,
-  long-term memory, or multi-agent communication.
+- **Knowledge is a lexical baseline:** no embeddings, semantic ranking, automatic
+  crawling, generic document parser, learned memory, or multi-agent communication.
 - **In-memory persistence:** history disappears on process exit; durable recovery
   and production retention/deletion policies remain unresolved.
 - **Cooperative adapters:** async timeouts require nonblocking, cancellation-aware
@@ -325,7 +354,7 @@ See the [Development Roadmap](docs/engineering/DEVELOPMENT_ROADMAP.md).
 - **Trusted application callers:** production authentication, fine-grained resource
   scopes, approval enforcement, and operational hardening remain future work.
 
-Tool output is data, never an instruction to broaden authority. Credentials must
+Tool output and retrieved text are data, never instructions to broaden authority. Credentials must
 remain outside model context when future integrations are introduced. Read the
 [security architecture](docs/architecture/SECURITY_AND_PERMISSIONS.md),
 [risk register](docs/engineering/RISK_REGISTER.md), and
@@ -339,7 +368,7 @@ remain outside model context when future integrations are introduced. Read the
 | Domain and system design | [Domain Model](docs/architecture/DOMAIN_MODEL.md), [System Architecture](docs/architecture/SYSTEM_ARCHITECTURE.md), [Agent Runtime](docs/architecture/AGENT_RUNTIME_ARCHITECTURE.md), [Data Architecture](docs/architecture/DATA_ARCHITECTURE.md) |
 | Engineering standards | [Principles](docs/engineering/ENGINEERING_PRINCIPLES.md), [testing](docs/engineering/TESTING_STRATEGY.md), [evaluation](docs/engineering/EVALUATION_STRATEGY.md), [observability](docs/engineering/OBSERVABILITY_STRATEGY.md) |
 | Shared terminology | [Glossary](docs/project/GLOSSARY.md), [assumptions](docs/project/ASSUMPTIONS.md), [open questions](docs/project/OPEN_QUESTIONS.md) |
-| Implementation evidence | [Stage 1](docs/STAGE_1_REPORT.md), [Stage 2](docs/STAGE_2_REPORT.md), [Stage 3](docs/STAGE_3_REPORT.md) |
+| Implementation evidence | [Stage 1](docs/STAGE_1_REPORT.md), [Stage 2](docs/STAGE_2_REPORT.md), [Stage 3](docs/STAGE_3_REPORT.md), [Stage 4](docs/STAGE_4_REPORT.md) |
 | Foundation history | [Stage 0](docs/STAGE_0_REPORT.md), [Stage 0.1](docs/STAGE_0_1_REFINEMENT_REPORT.md) |
 
 Key decisions: [architecture principles](docs/architecture/ADR/ADR-001-architecture-principles.md),

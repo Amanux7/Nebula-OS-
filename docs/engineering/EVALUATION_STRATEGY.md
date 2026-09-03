@@ -19,6 +19,24 @@ A unit test asks whether deterministic software obeys a specified contract—for
 
 ## Evaluation dimensions
 
+### Stage 4 retrieval and grounding baseline
+
+`knowledge_cases.json` defines knowledge_required, knowledge_not_needed,
+missing_knowledge, conflicting_knowledge, stale_knowledge_version,
+unauthorized_knowledge_source, source_prompt_injection, query_injection,
+fabricated_knowledge_reference, and tool_vs_knowledge. All are executed as scripted
+regression cases, not merely stored descriptions. They measure deterministic scope,
+provenance, lifecycle, bounded ranking, conflict-gap behavior, and evidence acceptance.
+
+The lexical-overlap v1 baseline excludes no-overlap chunks and has stable tie-breaking
+and source caps. It does not measure semantic recall, synonyms, or natural-language
+query choice. `knowledge-facts-v1` accepts exact structured key/value/reference tuples
+from the active same-run pack alongside existing supplied/tool facts. Returned
+conflicting values produce gaps; omitted or unindexed conflicts are not detected.
+Free-text candidates keep their references but do not certify paraphrases. No live
+model, semantic judge, learned reranker, or held-out production relevance score is
+claimed. Future hybrid retrieval and calibrated entailment require new evidence.
+
 ### Stage 3 tool-selection boundary
 
 `tests/fixtures/agent_eval/tool_cases.json` adds tool_needed, tool_not_needed,

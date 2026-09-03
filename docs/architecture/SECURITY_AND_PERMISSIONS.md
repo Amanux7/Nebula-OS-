@@ -2,6 +2,29 @@
 
 ## Security posture
 
+### Implemented Stage 4 controls
+
+KnowledgeScope pins source identities and trust classes on AgentDefinitionVersion.
+Query filters only narrow grants. Eligibility precedes ranking; candidate/store checks
+reject forged, foreign, altered, ungranted, disabled, or incorrectly versioned evidence.
+Source/chunk reads check workspace; pack reads additionally check run identity.
+Active evidence is rechecked before and after model invocation, including disablement
+during I/O. Source updates preserve exact historical evidence rather than replacing it.
+
+Text/Markdown/JSON are bounded data, not executable formats. UTF-8, controls, JSON
+shape/duplicate keys, lengths, chunk counts, query filters, full pack size, and per-run
+retrieval count are enforced. Caller and tool source IDs cannot spoof knowledge:
+provenance. Exact structured facts, not free-text paraphrases, may ground completion.
+Source/query injection fixtures prove unchanged software authority and no unauthorized
+source content in results—not perfect model resistance to adversarial text.
+
+Trusted host code initiates publication and retrieval; there is no authenticated API
+or automatic secret classifier. Operators must not publish secret-bearing source data
+to an agent's allowed scope. Events contain allowlisted correlation/size/version fields,
+not raw query or document bodies. Historical packs contain query/evidence and need
+future retention/redaction policy. In-process adapter trust and offline corpus bounds
+are not a hostile-code sandbox. See [ADR-007](ADR/ADR-007-company-brain-and-knowledge-retrieval.md).
+
 Agent output, retrieved content, tool output, integration data, and model responses are untrusted inputs. Authority comes from authenticated identities and enforced policy, never from prompt text. Controls are deny-by-default, workspace-scoped, and applied immediately before privileged access or action.
 
 ## Initial permission model
