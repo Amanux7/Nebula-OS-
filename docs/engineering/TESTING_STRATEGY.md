@@ -2,6 +2,18 @@
 
 ## Objectives
 
+Stage 2 implementation evidence is in [Stage 2 report](../STAGE_2_REPORT.md).
+Run `python -m ruff format --check src tests`, `python -m ruff check src tests`,
+`python -m mypy`, and `python -m pytest -q` after installing `.[dev]`.
+CI uses the same checks with no secrets or live-provider calls. Dependency setup
+downloads packages; the test phase itself requires no network service.
+
+`tests/test_runtime.py` exercises completion, bounded iterations/context, wait/resume,
+grounding pressure, policy/schema rejection, provider and real async timeouts,
+stale versions, cross-workspace references, duplicate drive/start, cancellation
+races, immutable definition history, serialization, and multi-record rollback.
+The scripted adapter is not evidence of probabilistic model quality.
+
 Tests protect domain invariants, tenant isolation, safe side effects, recoverability, policy enforcement, and reproducible behavior. The regular suite must run without paid services or live model calls. Tests are layered by failure locality rather than a single end-to-end pyramid.
 
 ## Test layers

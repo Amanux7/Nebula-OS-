@@ -1,0 +1,43 @@
+"""Runtime persistence and shared atomic boundary, separate from domain commands."""
+
+from contextlib import AbstractContextManager
+from typing import Protocol
+
+from agent_company_os.domain.agent import (
+    AgentDefinitionId,
+    AgentDefinitionVersion,
+    AgentRun,
+    AgentRunId,
+    Observation,
+)
+from agent_company_os.domain.decisions import Action
+from agent_company_os.domain.events import Event
+from agent_company_os.domain.ids import TaskAttemptId, Version, WorkspaceId
+from agent_company_os.domain.transitions import StateTransition
+from agent_company_os.ports.store import DomainStore
+
+
+class RuntimeStore(Protocol):
+    @property
+    def domain(self) -> DomainStore: ...
+    def atomic(self) -> AbstractContextManager[None]: ...
+    def publish(self, definition: AgentDefinitionVersion) -> None: ...
+    def definition(
+        self,
+        workspace_id: WorkspaceId,
+        definition_id: AgentDefinitionId,
+        version: Version,
+    ) -> AgentDefinitionVersion: ...
+    def get_run(self, workspace_id: WorkspaceId, run_id: AgentRunId) -> AgentRun: ...
+    def for_attempt(self, attempt_id: TaskAttemptId) -> tuple[AgentRun, ...]: ...
+    def add_run(self, run: AgentRun) -> None: ...
+    def save_run(
+        self,
+        run: AgentRun,
+        expected_version: Version,
+        transition: StateTransition | None,
+    ) -> None: ...
+    def append_event(self, event: Event) -> None: ...
+    def append_action(self, action: Action) -> None: ...
+    def append_observation(self, observation: Observation) -> None: ...
+    def events(self, workspace_id: WorkspaceId) -> tuple[Event, ...]: ...

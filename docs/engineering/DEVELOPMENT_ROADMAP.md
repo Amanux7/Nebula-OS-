@@ -24,6 +24,8 @@ Stages are capability gates, not calendar estimates. A later stage begins only w
 
 ## Stage 1 — Deterministic Domain Foundation
 
+- **Verified status (2026-09-03):** cleanup gate passed, 51 tests and formatting/lint/type checks. See [Stage 1 report](../STAGE_1_REPORT.md); this is the actual verification date, not a historical CI claim.
+
 - **Objective:** create a minimal executable domain foundation that proves software guarantees without AI behavior.
 - **Build:** Workspace identity/scope, opaque IDs, versioned schemas, Goal lifecycle, Task lifecycle, TaskAttempt lifecycle, Execution lifecycle, explicit StateTransition history, a minimal versioned Event/audit envelope, deterministic clock/ID ports, optimistic concurrency/version guards, typed command/query boundaries, in-memory/test persistence adapters, workspace-isolation invariants, repository tooling, and CI. AgentDefinition and AgentDefinitionVersion may exist only as minimal type/reference concepts needed to prove immutable historical binding.
 - **Do not build:** LLM calls, model providers, AgentRun/reasoning loop, Action/Observation runtime families, Tool execution, RAG, embeddings, Memory system or generic memory fields, multi-agent communication, orchestration implementation, MCP, production background queues/workers, graph UI, autonomous actions, production database, event sourcing, CQRS, microservices, or agent frameworks.
@@ -32,6 +34,8 @@ Stages are capability gates, not calendar estimates. A later stage begins only w
 - **Questions answered:** primary implementation language, project/module boundaries, validation approach, canonical lifecycle representation, concurrency guard contract, and minimum schema-versioning strategy. A database or infrastructure choice is not required; if introduced, it requires a separate evidence-based ADR.
 
 ## Stage 2 — Single-agent runtime
+
+- **Implemented status (2026-09-03):** bounded single-agent runtime and Research Brief Agent validated with scripted model fixtures; [Stage 2 report](../STAGE_2_REPORT.md) records exact checks and limitations. No live-model capability is claimed.
 
 - **Objective:** prove one bounded reasoning loop against a fake model.
 - **Build:** AgentDefinition/AgentDefinitionVersion behavior configuration, AgentRun and AgentInvocation contracts, context contract, initial typed model Action/Observation families, structured decision schema, model port and scripted double, limits, cancellation, terminal evaluation, and traces.
@@ -141,4 +145,8 @@ Stages are capability gates, not calendar estimates. A later stage begins only w
 
 ## Immediate next milestone
 
-Stage 1 should produce no AI feature claims. Its deliverable is a small executable deterministic domain core and CI suite proving Workspace isolation, versioned schemas, Goal/Task/TaskAttempt/Execution lifecycles, StateTransition/Event records, retry lineage, terminal-state rules, optimistic concurrency, and typed adapter boundaries. Use in-memory/test persistence unless an invariant genuinely requires more; do not begin Stage 2 automatically.
+Stage 2 now provides a scripted, bounded decision loop inside the deterministic
+foundation. The next proposed stage is Tool Runtime, beginning with isolated
+read-only fixtures, policy checks, typed receipts, and idempotency. Stage 3 is not
+started automatically. Live-provider answer quality, durable storage, and production
+readiness are not implied by the deterministic runtime gate.
