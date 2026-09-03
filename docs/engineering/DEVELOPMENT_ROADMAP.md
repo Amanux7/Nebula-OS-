@@ -44,14 +44,15 @@ Stages are capability gates, not calendar estimates. A later stage begins only w
 - **Completion criteria:** a scripted AgentRun completes, fails with a categorized timeout where applicable, cancels, and escalates correctly with reproducible TaskAttempt and Execution traces bound to an exact AgentDefinitionVersion.
 - **Questions answered:** minimum runtime contract, decision types, error taxonomy, trace granularity, whether a focused library helps.
 
-## Stage 3 — Tool system
+## Stage 3 — Tool Runtime
 
-- **Objective:** execute deterministic capabilities safely through one boundary.
-- **Build:** Tool Definition/version, registry, typed adapters, policy hook, secret reference, risk class, timeouts, retries, idempotency, receipts; begin with local/read-only fixtures.
-- **Do not build:** broad connector catalog, unrestricted code/shell/browser access, agent-owned credentials.
-- **Tests required:** schema/semantic validation, deny/approval paths, transient/permanent/ambiguous failures, replay, rate and size limits, secret redaction.
-- **Completion criteria:** no tool bypasses policy; duplicate-effects fixtures remain single-effect; outcome certainty is explicit.
-- **Questions answered:** tool contract, permission declaration, adapter isolation, connection model.
+- **Implemented status (2026-09-03):** offline read-only tool gate passed. [Stage 3 report](../STAGE_3_REPORT.md) records exact local checks; no live-tool or production guarantee is claimed.
+- **Objective:** authorize, bound, execute, and audit typed capabilities outside model reasoning.
+- **Build:** ToolDefinition/immutable ToolVersion, exact registry/grants, ToolInvocation/ToolReceipt, ToolExecutor/FakeToolExecutor, call_tool, two read-only fixture lookups, strict schemas, time/call/byte bounds, no-retry policy seam, Action-identity idempotency, claim/revalidation/atomic reconciliation, bounded Observations, receipt-grounded completion, and explicit audit export.
+- **Do not build:** external writes, approval engine, secret/connection system, real network dependency, shell/browser/filesystem tools, MCP, OAuth, RAG, Memory, multi-agent runtime, or production infrastructure.
+- **Tests required:** successful use/continuation; denied, unknown, disabled, foreign, and unpublished tools; invalid inputs/outputs; timeout; recovery; budgets; duplicate/stale calls; cancellation; immutable version history; forged/foreign evidence; injection; byte/context limits; claim/result rollback.
+- **Completion criteria:** only granted read-only tools execute; same invocation is not executed twice; receipt outcomes and trust are explicit; all checks pass offline. This does not establish exactly-once external writes.
+- **Questions answered:** tool identity versus version, permission declaration, executor port, bounded evidence, local idempotency and failure policy. Production isolation, connections, durable recovery, and approval remain deferred under ADR-006.
 
 ## Stage 4 — Knowledge / Company Brain
 
@@ -145,8 +146,8 @@ Stages are capability gates, not calendar estimates. A later stage begins only w
 
 ## Immediate next milestone
 
-Stage 2 now provides a scripted, bounded decision loop inside the deterministic
-foundation. The next proposed stage is Tool Runtime, beginning with isolated
-read-only fixtures, policy checks, typed receipts, and idempotency. Stage 3 is not
-started automatically. Live-provider answer quality, durable storage, and production
-readiness are not implied by the deterministic runtime gate.
+Stage 3 provides a controlled read-only tool boundary and receipt-grounded scripted
+scenarios. The next proposed milestone is Stage 4: Company Brain / Knowledge Retrieval,
+beginning with source-aware authorized context and a measured retrieval baseline.
+Stage 4 is not started automatically. Live-provider answer quality, durable storage,
+production readiness, and external write capability are not implied by this gate.

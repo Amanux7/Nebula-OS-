@@ -5,7 +5,7 @@
 The future Agent Runtime executes one bounded AgentRun for a TaskAttempt. It turns an immutable AgentDefinitionVersion and authorized context into validated Actions, Observations, explicit StateTransitions, and a terminal or waiting outcome inside an enclosing Execution.
 
 The sections labelled future remain the long-term conceptual contract. Stage 2 now
-implements the narrow subset described below; it does not implement all capabilities
+implements the base subset described below, extended by Stage 3; neither implements all capabilities
 shown in the future pipeline.
 
 ## Implemented Stage 2 subset
@@ -42,6 +42,41 @@ must be cooperative/nonblocking; this is not a sandbox for hostile adapter code.
 No live-model quality or universal hallucination/injection protection is claimed.
 
 ## Runtime vocabulary
+
+### Implemented Stage 3 extension
+
+[ADR-006](ADR/ADR-006-tool-runtime.md) adds exactly `call_tool`. ToolRuntimeService,
+behind ToolRuntimePort, owns registry resolution, exact grants/risk checks, strict
+input/output validation, claim/reconciliation, receipts, budgets, and Observations.
+AgentRuntimeService coordinates with this boundary but never owns executors.
+
+ToolDefinition is stable identity; ToolVersion is immutable contract/configuration.
+ToolInvocation starts running after authorization and ends succeeded/failed/cancelled.
+ToolReceipt snapshots the terminal invocation and bounded observed output or failure.
+Rejected preflight requests receive Events/Observations without an executor call.
+Only CompanyFactLookup and SourceFactLookup fixture adapters execute; all write risks
+are denied. An optional new Research Brief Agent definition version grants exact tools.
+
+Claim and persist before I/O; await outside locks; validate run/parent versions,
+active state, deadline, registry revision, and invocation state before atomic result
+commit. Exact Action replay cannot call the executor twice; new Actions may deliberately
+repeat a read within budgets. Late results cannot mutate terminal state. Tool failures
+normally return Observations; runtime faults and exhausted limits terminate the run.
+
+Defaults add 5 calls/run, 3/tool, 3 seconds/tool, 2,048 input bytes, 8,192 output bytes,
+and no retries. Receipt output holds at most ten facts; each Observation exposes at
+most five plus bounded notes and references, counted against context limits. All
+limits survive wait/resume. A result is not Task completion: another validated model
+decision is required. Exact receipt-backed findings extend the supplied-fact evaluator.
+Receipt provenance is evidence of an observation, not an objective-truth guarantee.
+
+Tool-enabled runs pin `single-agent-tools-v1` / `read-only-tools-v1` /
+`receipt-facts-v1`; no-tool runs retain Stage 2 semantic identities. Full validated
+receipt snapshots and immutable Observations survive context-window eviction in the
+in-memory store, but do not survive process loss. No live model, external network,
+approval, Memory, Knowledge Retrieval, or multi-agent behavior is added.
+
+### Shared vocabulary
 
 | Concept | Runtime meaning |
 |---|---|
@@ -190,6 +225,7 @@ Future model adapters, context retrievers, memory providers, tool adapters, poli
 
 - **Stage 1:** deterministic Workspace, Goal, Task, TaskAttempt, Execution, StateTransition, minimal Event envelope, typed boundaries, and in-memory/test adapters only.
 - **Stage 2:** one AgentRun loop against a deterministic model double; exact Action/Observation contracts needed for model invocation.
-- **Later stages:** Tool Actions, Knowledge retrieval, Memory, replaceable orchestration, and multi-agent communication.
+- **Stage 3:** read-only fixture tools, exact grants, ToolInvocation/ToolReceipt evidence, bounded Observations, and receipt grounding.
+- **Later stages:** Knowledge retrieval, Memory, replaceable orchestration, external integrations/writes, and multi-agent communication.
 
 See [Development Roadmap](../engineering/DEVELOPMENT_ROADMAP.md), [ADR-002](ADR/ADR-002-execution-domain-semantics.md), and [ADR-003](ADR/ADR-003-agent-definition-and-runtime-identity.md).

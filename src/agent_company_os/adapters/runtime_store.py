@@ -23,6 +23,13 @@ from agent_company_os.domain.errors import (
 )
 from agent_company_os.domain.events import Event
 from agent_company_os.domain.ids import TaskAttemptId, Version, WorkspaceId
+from agent_company_os.domain.tools import (
+    ToolInvocation,
+    ToolInvocationId,
+    ToolInvocationStatus,
+    ToolReceipt,
+    ToolReceiptId,
+)
 from agent_company_os.domain.transitions import StateTransition, SubjectType
 
 
@@ -35,6 +42,8 @@ class InMemoryRuntimeStore:
         self._actions: dict[ActionId, Action] = {}
         self._observations: dict[ObservationId, Observation] = {}
         self._transitions: list[StateTransition] = []
+        self._tool_invocations: dict[ToolInvocationId, ToolInvocation] = {}
+        self._tool_receipts: dict[ToolReceiptId, ToolReceipt] = {}
 
     @contextmanager
     def atomic(self) -> Iterator[None]:
@@ -46,6 +55,8 @@ class InMemoryRuntimeStore:
                 self._actions.copy(),
                 self._observations.copy(),
                 self._transitions.copy(),
+                self._tool_invocations.copy(),
+                self._tool_receipts.copy(),
             )
             try:
                 yield
@@ -57,6 +68,8 @@ class InMemoryRuntimeStore:
                     self._actions,
                     self._observations,
                     self._transitions,
+                    self._tool_invocations,
+                    self._tool_receipts,
                 ) = snapshot
                 raise
 
@@ -76,6 +89,61 @@ class InMemoryRuntimeStore:
             if definition.version.value != len(lineage) + 1:
                 raise InvariantViolation("definition_version_sequence")
             self._definitions[key] = definition
+
+    def action(self, workspace_id: WorkspaceId, action_id: ActionId) -> Action:
+        try:
+            action = self._actions[action_id]
+        except KeyError as error:
+            raise EntityNotFound("Action", str(action_id)) from error
+        self._scope(workspace_id, action.workspace_id)
+        return action
+
+    def tool_invocations(
+        self, workspace_id: WorkspaceId, run_id: AgentRunId
+    ) -> tuple[ToolInvocation, ...]:
+        self.get_run(workspace_id, run_id)
+        return tuple(item for item in self._tool_invocations.values() if item.run_id == run_id)
+
+    def tool_receipts(
+        self, workspace_id: WorkspaceId, run_id: AgentRunId
+    ) -> tuple[ToolReceipt, ...]:
+        self.get_run(workspace_id, run_id)
+        return tuple(
+            item for item in self._tool_receipts.values() if item.invocation.run_id == run_id
+        )
+
+    def add_tool_invocation(self, invocation: ToolInvocation) -> None:
+        with self.atomic():
+            run = self.get_run(invocation.workspace_id, invocation.run_id)
+            action = self.action(invocation.workspace_id, invocation.action_id)
+            if (
+                action.run_id != run.id
+                or invocation.task_attempt_id != run.task_attempt_id
+                or invocation.execution_id != run.execution_id
+                or invocation.run_version != run.version
+                or invocation.tool_version.definition.workspace_id != run.workspace_id
+                or invocation.tool_version.grant not in run.definition_version.allowed_tools
+                or invocation.id in self._tool_invocations
+                or invocation.version != Version(1)
+                or invocation.status is not ToolInvocationStatus.RUNNING
+                or any(item.action_id == action.id for item in self._tool_invocations.values())
+            ):
+                raise InvariantViolation("tool_invocation_binding_or_duplicate")
+            self._tool_invocations[invocation.id] = invocation
+
+    def finish_tool_invocation(self, receipt: ToolReceipt) -> None:
+        with self.atomic():
+            invocation = receipt.invocation
+            self.get_run(invocation.workspace_id, invocation.run_id)
+            previous = self._tool_invocations[invocation.id]
+            if (
+                receipt.id in self._tool_receipts
+                or invocation.ended_at is None
+                or previous.finish(invocation.ended_at, invocation.error_code) != invocation
+            ):
+                raise InvariantViolation("tool_receipt_append_only")
+            self._tool_invocations[invocation.id] = invocation
+            self._tool_receipts[receipt.id] = receipt
 
     def definition(
         self,

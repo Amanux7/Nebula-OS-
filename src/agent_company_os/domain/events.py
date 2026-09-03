@@ -13,6 +13,10 @@ from agent_company_os.domain.validation import clean_required_text, require_utc
 
 
 class EventType(StrEnum):
+    TOOL_INVOCATION_STARTED = "tool_invocation_started"
+    TOOL_REQUEST_REJECTED = "tool_request_rejected"
+    TOOL_RECEIPT_RECORDED = "tool_receipt_recorded"
+    TOOL_RESULT_OBSERVED = "tool_result_observed"
     AGENT_RUN_STARTED = "agent_run_started"
     MODEL_INVOCATION_REQUESTED = "model_invocation_requested"
     MODEL_INVOCATION_FAILED = "model_invocation_failed"

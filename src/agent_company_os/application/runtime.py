@@ -7,6 +7,7 @@ from datetime import timedelta
 from agent_company_os.application.context import ActionPolicy, ContextAssembler
 from agent_company_os.application.service import DomainService
 from agent_company_os.domain.agent import (
+    ActionType,
     AgentDefinitionId,
     AgentRun,
     AgentRunId,
@@ -18,6 +19,7 @@ from agent_company_os.domain.agent import (
 )
 from agent_company_os.domain.decisions import (
     Action,
+    CallTool,
     CompleteTask,
     ModelFailure,
     RequestMoreContext,
@@ -41,6 +43,7 @@ from agent_company_os.ports.clock import Clock
 from agent_company_os.ports.ids import IdGenerator
 from agent_company_os.ports.model import ModelPort
 from agent_company_os.ports.runtime_store import RuntimeStore
+from agent_company_os.ports.tools import ToolRuntimePort
 
 
 @dataclass(frozen=True)
@@ -62,11 +65,13 @@ class AgentRuntimeService:
         clock: Clock,
         ids: IdGenerator,
         model: ModelPort,
+        tools: ToolRuntimePort | None = None,
     ) -> None:
         self.store = store
         self.clock = clock
         self.ids = ids
         self.model = model
+        self.tools = tools
         self.domain = DomainService(store.domain, clock, ids)
         self.assembler = ContextAssembler()
         self.policy = ActionPolicy()
@@ -99,6 +104,15 @@ class AgentRuntimeService:
                 context,
                 self.clock.now(),
                 self.clock.now() + timedelta(seconds=limits.execution_seconds),
+                runtime_protocol="single-agent-tools-v1"
+                if ActionType.CALL_TOOL in definition.allowed_actions
+                else "single-agent-v1",
+                policy_version="read-only-tools-v1"
+                if ActionType.CALL_TOOL in definition.allowed_actions
+                else "internal-actions-v1",
+                evaluator_version="receipt-facts-v1"
+                if ActionType.CALL_TOOL in definition.allowed_actions
+                else "supplied-facts-v1",
             )
             self._parents(run)
             self.store.add_run(run)
@@ -163,10 +177,13 @@ class AgentRuntimeService:
                     self._deadline(run)
                     if self.model.model_name != run.definition_version.model_name:
                         raise InvariantViolation("model_binding_changed")
+                    tool_enabled = ActionType.CALL_TOOL in run.definition_version.allowed_actions
                     if (
-                        run.policy_version != self.policy.version
-                        or run.runtime_protocol != "single-agent-v1"
-                        or run.evaluator_version != "supplied-facts-v1"
+                        run.policy_version != self.policy.version_for(run)
+                        or run.runtime_protocol
+                        != ("single-agent-tools-v1" if tool_enabled else "single-agent-v1")
+                        or run.evaluator_version
+                        != ("receipt-facts-v1" if tool_enabled else "supplied-facts-v1")
                     ):
                         raise InvariantViolation("runtime_configuration_version_changed")
                     if run.working_state.invocation_pending:
@@ -178,7 +195,12 @@ class AgentRuntimeService:
                     )
                     claimed = run.evolve(at=self.clock.now(), working_state=state)
                     self._save(run, claimed, EventType.MODEL_INVOCATION_REQUESTED)
-                    request = self.assembler.assemble(claimed, snapshot.goal, snapshot.task)
+                    request = self.assembler.assemble(
+                        claimed,
+                        snapshot.goal,
+                        snapshot.task,
+                        self.tools.descriptors(claimed) if self.tools else (),
+                    )
                     started = self.clock.now()
                 # Never hold a store lock across a model call. Adapter is cooperative async.
                 remaining = (claimed.deadline - self.clock.now()).total_seconds()
@@ -191,6 +213,35 @@ class AgentRuntimeService:
                     raise
                 except Exception as error:
                     raise ModelFailure("provider_unavailable") from error
+                decision = parse_decision(raw, claimed.limits.max_response_chars)
+                if isinstance(decision.payload, CallTool):
+                    with self.store.atomic():
+                        current = self.store.get_run(workspace_id, run_id)
+                        self._version(current, claimed.version)
+                        self._deadline(current)
+                        if self._parents(current).versions != snapshot.versions:
+                            raise ModelFailure("version_conflict")
+                        self.policy.authorize(current, decision)
+                        if self.tools is None:
+                            raise ModelFailure("unauthorized_action")
+                        action = Action(
+                            self.ids.action_id(),
+                            current.id,
+                            workspace_id,
+                            decision,
+                            current.working_state.iteration,
+                        )
+                        self.store.append_action(action)
+                        self._event(current, EventType.MODEL_DECISION_RECEIVED)
+                        self._event(
+                            current,
+                            EventType.ACTION_REQUESTED,
+                            (("action_type", decision.action_type.value),),
+                        )
+                    run = await self.tools.invoke(workspace_id, run_id, action, current.version)
+                    if run.status is not AgentRunStatus.RUNNING:
+                        return run
+                    continue
                 with self.store.atomic():
                     current = self.store.get_run(workspace_id, run_id)
                     self._version(current, claimed.version)
@@ -230,7 +281,11 @@ class AgentRuntimeService:
                     missing: tuple[str, ...] = ()
                     kind = ObservationKind.ACTION_ACCEPTED
                     if isinstance(decision.payload, CompleteTask):
-                        result = validate_brief(decision.payload, current.context)
+                        result = validate_brief(
+                            decision.payload,
+                            current.context,
+                            self.tools.evidence(current) if self.tools else (),
+                        )
                         attempt = self.domain.succeed_task_attempt(
                             latest.attempt.id, latest.attempt.version
                         )

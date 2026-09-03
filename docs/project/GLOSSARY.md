@@ -11,7 +11,14 @@ This file is the canonical terminology reference. Documents should link here rat
 | AgentInvocation | Typed command/request that asks the runtime to start an AgentRun. | A command, not the runtime participant or the enclosing Execution. |
 | Skill | Reusable, versioned capability or procedure that describes how to perform a class of work and may compose Tools. | A Skill guides capability; a Tool executes an operation. |
 | Tool | Executable, typed interface to a deterministic capability or external system, governed by Tool Permissions. | Does not decide why/when it should run and never grants itself authority. |
-| Tool Definition | Versioned contract for a Tool operation, including schemas, risk/side-effect class, timeout/retry semantics, and required connection/scopes. | Definition, not a particular call. |
+| ToolDefinition | Stable workspace-scoped Tool identity, name, description, and risk classification. | Not an invocation or mutable executable contract; Stage 3 clarifies the former Tool Definition umbrella. |
+| ToolVersion | Exact immutable published ToolDefinition contract/configuration: named input/output schemas, executor kind, trust, timeout/byte bounds, and retry policy. | Historical receipts embed the exact snapshot, never a latest alias. |
+| ToolGrant | Exact ToolId and Version granted by an immutable AgentDefinitionVersion. | Neither model text nor tool output can widen it; write classes remain denied. |
+| ToolInvocation | One authorized attempt to execute an exact ToolVersion for an Action/AgentRun/TaskAttempt/Execution. | Running to succeeded, failed, or cancelled; a deliberate new Action is a new invocation even with identical arguments. |
+| ToolReceipt | Immutable bounded runtime evidence of a terminal ToolInvocation, validated input/configuration/output or failure, timestamps, and provenance. | Proves what was observed, not objective truth; separate from model text and bounded Observation. |
+| ToolRegistry | Registry resolving an exact published grant to an immutable version and executor, with workspace/enablement checks. | No dynamic function names or ambiguous latest-version selection. |
+| ToolExecutor | Provider-neutral cooperative async port from validated input plus invocation context to untrusted result JSON. | Stage 3 has two read-only fixture adapters and a scripted fake; not a process sandbox. |
+| ToolRuntimeService | Application responsibility for authorization, validation, invocation claims, execution, reconciliation, receipts, and bounded tool Observations. | Separate from AgentRuntimeService and from model reasoning. |
 | Task | Bounded logical unit of work with inputs, acceptance criteria, dependencies, assignment, and lifecycle, belonging to exactly one Goal in the initial model. | Exists independently of its attempts and may have multiple TaskAttempts. |
 | TaskAttempt | One concrete attempt to perform exactly one Task within exactly one Execution. | Retry creates a new attempt and preserves terminated history. |
 | Goal | Desired outcome with constraints and acceptance criteria that may be decomposed into Tasks. | Outcome, not a plan, Task, attempt, or Execution; attempt failure does not automatically close it. |
@@ -52,7 +59,7 @@ This file is the canonical terminology reference. Documents should link here rat
 | Reason Category | Stable non-sensitive classification explaining why an action/state was selected (for example `insufficient_evidence` or `policy_requires_approval`). | Not verbatim private reasoning. |
 | AgentWorkingState | Bounded iteration metadata, recent Observations, missing fields, and pending-invocation guard for one AgentRun. | Short-lived run state, not Memory; limits survive wait/resume. |
 | ModelPort | Provider-neutral cooperative asynchronous model invocation boundary. | Stage 2 supplies only a scripted fake adapter, not a live AI model. |
-| ResearchBrief | Structured accepted findings, gaps, source references, and software-rendered summary from supplied facts. | Stage 2 uses exact fixture matching, not general natural-language entailment. |
+| ResearchBrief | Structured accepted findings, gaps, source references, and software-rendered summary from supplied facts or approved receipt evidence. | Stage 3 extends exact fixture matching to successful same-run receipts, not general natural-language entailment. |
 
 ## Autonomy levels
 
