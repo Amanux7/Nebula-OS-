@@ -1,6 +1,6 @@
 # Agent Company OS
 
-**Current Stage: Stage 0.1 — Architecture Refinement**
+**Current Stage: Stage 2 — Single-Agent Runtime (scripted-model verification)**
 
 Agent Company OS is a working title for a production-oriented platform for operating an AI-native organization. It is intended to coordinate goals, specialized agents, deterministic workflows, governed tools, shared knowledge, human approvals, and auditable execution—without reducing the product to a collection of chatbots.
 
@@ -10,7 +10,7 @@ Current AI assistants are often isolated, difficult to govern, weakly observable
 
 ## High-level architecture
 
-The conceptual system separates the experience and application layers from orchestration, agent and tool runtimes, knowledge and memory, durable state, policy enforcement, observability, and evaluation. The architecture is technology-agnostic at this stage. See [System Architecture](docs/architecture/SYSTEM_ARCHITECTURE.md) and [Domain Model](docs/architecture/DOMAIN_MODEL.md).
+The conceptual system separates application, runtime, policy, and persistence boundaries. The implemented slice uses Python 3.13, immutable domain entities, typed ports, in-memory adapters, and one bounded single-agent loop. Tools, knowledge retrieval, memory, and multi-agent orchestration remain future work. See [System Architecture](docs/architecture/SYSTEM_ARCHITECTURE.md) and [Domain Model](docs/architecture/DOMAIN_MODEL.md).
 
 ## Documentation map
 
@@ -25,4 +25,35 @@ Build trust and visibility before autonomy. Keep state explicit, boundaries type
 
 ## Current status and next milestone
 
-Stage 0 defined the product and engineering foundation. Stage 0.1 refines execution semantics, AgentDefinition versioning, runtime identity, Goal/Task boundaries, the orchestration seam, Memory boundaries, and minimal-infrastructure constraints. No application, LLM integration, runtime, Tool execution, RAG, or dashboard has been implemented. The next milestone is **Stage 1: Deterministic Domain Foundation**, as specified in the [development roadmap](docs/engineering/DEVELOPMENT_ROADMAP.md).
+Stage 1 implements deterministic Workspace/Goal/Task/TaskAttempt/Execution state,
+version guards, and audit history. Stage 2 adds immutable AgentDefinition versions,
+AgentRun, structured decisions, internal Actions/Observations, policy validation,
+bounded working state, and wait/resume. The Research Brief Agent operates only on
+supplied facts. Its default adapter is scripted, not a live AI model.
+
+Read [Stage 1 verification](docs/STAGE_1_REPORT.md), [Stage 2 report](docs/STAGE_2_REPORT.md),
+[language decision](docs/architecture/ADR/ADR-004-implementation-language.md), and
+[runtime decision](docs/architecture/ADR/ADR-005-single-agent-runtime.md).
+No paid calls or credentials are required. No Tool Runtime, RAG, Memory, MCP,
+multi-agent system, UI, or production persistence is implemented.
+
+## Development
+
+Python 3.13, from the repository root:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+.\.venv\Scripts\python.exe -m ruff format --check src tests
+.\.venv\Scripts\python.exe -m ruff check src tests
+.\.venv\Scripts\python.exe -m mypy
+.\.venv\Scripts\python.exe -m pytest -q
+```
+
+On macOS/Linux use `.venv/bin/python` instead. Installation downloads development
+dependencies; the suite itself is offline, deterministic, and secret-free.
+Run `python -m pytest tests/test_runtime.py -q` in the activated environment for
+the single-agent demo/failure suite. `test_grounded_completion_fixtures` proves
+completion; `test_wait_supply_resume_same_identity` proves context resumption.
+
+The next proposed milestone is **Stage 3: Tool Runtime**. It has not been started.

@@ -7,7 +7,7 @@ This file is the canonical terminology reference. Documents should link here rat
 | Agent | A reasoning actor configured to pursue a Goal or Task within explicit Context, capabilities, Working State, limits, and Policy. | Conceptual actor, not a prompt, Tool, Skill, Workflow, model, or Department. |
 | AgentDefinition | Stable workspace-scoped logical identity and version lineage for an agent configuration. | Configuration identity, never active runtime participation. |
 | AgentDefinitionVersion | Immutable behavior configuration for an AgentDefinition, including versioned instructions and capability/Policy/model references. | The exact version—not a mutable active alias—is bound to history. |
-| AgentRun | Future bounded runtime participation of exactly one AgentDefinitionVersion for a TaskAttempt within an Execution. | Replaces `AgentInstance`; not implemented in Stage 1, and persistence form is deferred. |
+| AgentRun | Bounded runtime participation of exactly one AgentDefinitionVersion for a TaskAttempt within an Execution. | Standalone versioned Stage 2 record; replaces `AgentInstance`. Terminal runs do not reopen. |
 | AgentInvocation | Typed command/request that asks the runtime to start an AgentRun. | A command, not the runtime participant or the enclosing Execution. |
 | Skill | Reusable, versioned capability or procedure that describes how to perform a class of work and may compose Tools. | A Skill guides capability; a Tool executes an operation. |
 | Tool | Executable, typed interface to a deterministic capability or external system, governed by Tool Permissions. | Does not decide why/when it should run and never grants itself authority. |
@@ -50,6 +50,9 @@ This file is the canonical terminology reference. Documents should link here rat
 | Structured Decision | Schema-validated runtime output selecting an allowed action and carrying arguments, evidence references, and non-sensitive reason metadata. | Does not include or require hidden chain-of-thought. |
 | Execution Trace | Query/view that correlates TaskAttempts, AgentRuns, Actions, Observations, StateTransitions, Events, approvals, usage, errors, and outcomes. | A projection, not a generic ExecutionStep store, canonical state, or chain-of-thought transcript. |
 | Reason Category | Stable non-sensitive classification explaining why an action/state was selected (for example `insufficient_evidence` or `policy_requires_approval`). | Not verbatim private reasoning. |
+| AgentWorkingState | Bounded iteration metadata, recent Observations, missing fields, and pending-invocation guard for one AgentRun. | Short-lived run state, not Memory; limits survive wait/resume. |
+| ModelPort | Provider-neutral cooperative asynchronous model invocation boundary. | Stage 2 supplies only a scripted fake adapter, not a live AI model. |
+| ResearchBrief | Structured accepted findings, gaps, source references, and software-rendered summary from supplied facts. | Stage 2 uses exact fixture matching, not general natural-language entailment. |
 
 ## Autonomy levels
 

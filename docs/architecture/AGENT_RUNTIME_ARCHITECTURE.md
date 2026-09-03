@@ -4,7 +4,42 @@
 
 The future Agent Runtime executes one bounded AgentRun for a TaskAttempt. It turns an immutable AgentDefinitionVersion and authorized context into validated Actions, Observations, explicit StateTransitions, and a terminal or waiting outcome inside an enclosing Execution.
 
-This is a conceptual contract, not an implementation. Stage 1 defines only deterministic domain lifecycles and version/reference semantics; model invocation and AgentRun behavior begin no earlier than Stage 2.
+The sections labelled future remain the long-term conceptual contract. Stage 2 now
+implements the narrow subset described below; it does not implement all capabilities
+shown in the future pipeline.
+
+## Implemented Stage 2 subset
+
+See [ADR-005](ADR/ADR-005-single-agent-runtime.md) for the accepted runtime decision.
+AgentRuntimeService is separate from DomainService. It starts a persisted AgentRun
+bound to an immutable published AgentDefinitionVersion, assembles task-scoped data,
+claims one model invocation, awaits a provider-neutral ModelPort without holding
+the store lock, and validates versions/state/deadline/schema/policy/output before
+committing. The only model adapter is the scripted FakeModel.
+
+The three actions are `respond`, `request_more_context`, and `complete_task`.
+Completion validates an extractive ResearchBrief against supplied facts and sources;
+arbitrary narrative is not accepted as evidence. Summary text is rendered by code.
+TaskAttempt/Task/eligible Execution completion plus AgentRun and audit records share
+one rollback boundary. Goal satisfaction remains explicit and separate.
+
+AgentRun uses running, waiting, succeeded, failed, cancelled. Wait/resume retains
+the Execution and TaskAttempt identities, deadline, and total iteration count.
+Defaults are 5 iterations, 60 seconds total, 5 seconds/model invocation, last 4
+Observations, 16,000 context characters, and 8,000 response characters. No background
+expiry worker exists; waiting expiry is checked on resume. Runtime source data
+cannot change action policy. Failure returns logical work to ready where still
+applicable; it does not assert the business Goal is impossible.
+
+Actions, Observations, Events, and StateTransitions are separate immutable records.
+Event metadata binds definition version, run/task/attempt/execution IDs, iteration,
+model, policy/protocol version, and status. Provider errors are categorized without
+copying raw exception messages. Rejected output payloads are not retained.
+
+The adapter is in-memory and not durable. It proves transaction rollback and stale
+decision rejection at test scale, not production recovery. Async model adapters
+must be cooperative/nonblocking; this is not a sandbox for hostile adapter code.
+No live-model quality or universal hallucination/injection protection is claimed.
 
 ## Runtime vocabulary
 
@@ -59,7 +94,9 @@ Historical records retain the version identifier plus enough immutable/transitiv
 
 AgentRun is the selected term for a future runtime participant. It contains or references its Execution, TaskAttempt, exact AgentDefinitionVersion, effective policy/configuration snapshot, bounds, and runtime status. It is bounded and cannot outlive its owning attempt semantics.
 
-AgentInvocation is the typed command that requests creation/start of an AgentRun. Whether AgentRun deserves a standalone persistent entity or can be represented as an invocation/run record under TaskAttempt remains deferred until Stage 2. `AgentInstance` is rejected because it implies a potentially durable, mutable persona without a proven domain need.
+AgentInvocation is the command that requests creation/start of an AgentRun. Stage 2
+selects a standalone AgentRun record under TaskAttempt (ADR-005). `AgentInstance`
+remains rejected; an AgentRun is bounded participation, not a durable persona.
 
 ### Context Assembly
 

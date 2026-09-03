@@ -2,6 +2,19 @@
 
 ## Unit test != agent evaluation
 
+Stage 2 seeds `tests/fixtures/agent_eval/cases.json` (schema version 1) with
+complete_context, missing_fact, conflicting_fact, irrelevant_context,
+instruction_attack, and unsupported_completion. Tests simulate both valid and
+invalid decisions with a scripted model. Exact supplied key/value/source matching
+and required-gap rules are the first deterministic evaluator; summary rendering
+does not accept arbitrary ungrounded prose.
+
+These are behavioral regression fixtures, not live-model scores or held-out
+research-quality evidence. Source truth, paraphrase entailment, nuanced comparison,
+and prompt-injection robustness require future calibrated evaluation. The injection
+fixture proves that source text cannot widen software action policy; it does not
+prove a probabilistic model will always ignore adversarial text.
+
 A unit test asks whether deterministic software obeys a specified contract—for example, whether a denied tool call remains unexecuted. An agent evaluation asks whether probabilistic behavior is useful and appropriate—for example, whether the agent chose the right evidence and tool. A passing evaluation cannot excuse a security invariant failure; a passing unit suite cannot establish answer quality.
 
 ## Evaluation dimensions
