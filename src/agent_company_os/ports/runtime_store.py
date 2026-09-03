@@ -4,6 +4,7 @@ from contextlib import AbstractContextManager
 from typing import Protocol
 
 from agent_company_os.domain.agent import (
+    ActionId,
     AgentDefinitionId,
     AgentDefinitionVersion,
     AgentRun,
@@ -13,11 +14,21 @@ from agent_company_os.domain.agent import (
 from agent_company_os.domain.decisions import Action
 from agent_company_os.domain.events import Event
 from agent_company_os.domain.ids import TaskAttemptId, Version, WorkspaceId
+from agent_company_os.domain.tools import ToolInvocation, ToolReceipt
 from agent_company_os.domain.transitions import StateTransition
 from agent_company_os.ports.store import DomainStore
 
 
 class RuntimeStore(Protocol):
+    def action(self, workspace_id: WorkspaceId, action_id: ActionId) -> Action: ...
+    def tool_invocations(
+        self, workspace_id: WorkspaceId, run_id: AgentRunId
+    ) -> tuple[ToolInvocation, ...]: ...
+    def tool_receipts(
+        self, workspace_id: WorkspaceId, run_id: AgentRunId
+    ) -> tuple[ToolReceipt, ...]: ...
+    def add_tool_invocation(self, invocation: ToolInvocation) -> None: ...
+    def finish_tool_invocation(self, receipt: ToolReceipt) -> None: ...
     @property
     def domain(self) -> DomainStore: ...
     def atomic(self) -> AbstractContextManager[None]: ...

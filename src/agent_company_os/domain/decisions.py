@@ -12,6 +12,7 @@ from agent_company_os.domain.agent import (
     SuppliedContext,
 )
 from agent_company_os.domain.ids import WorkspaceId
+from agent_company_os.domain.tools import ToolId
 
 
 class ModelFailure(Exception):
@@ -36,6 +37,7 @@ class ModelFailure(Exception):
             "model_refused",
             "version_conflict",
             "deadline_exceeded",
+            "tool_budget_exceeded",
         }:
             code = "provider_unavailable"
         super().__init__(code)
@@ -58,7 +60,13 @@ class CompleteTask:
     gaps: tuple[str, ...]
 
 
-type DecisionPayload = Respond | RequestMoreContext | CompleteTask
+@dataclass(frozen=True)
+class CallTool:
+    tool_id: ToolId
+    arguments_json: str
+
+
+type DecisionPayload = Respond | RequestMoreContext | CompleteTask | CallTool
 
 
 @dataclass(frozen=True)
@@ -125,7 +133,15 @@ def parse_decision(raw: str, max_chars: int) -> ModelDecision:
     except ValueError as error:
         raise ModelFailure("unauthorized_action") from error
     payload: DecisionPayload
-    if kind is ActionType.RESPOND:
+    if kind is ActionType.CALL_TOOL:
+        content = _object(item["payload"], {"tool_id", "arguments"})
+        if not isinstance(content["arguments"], dict):
+            raise ModelFailure("schema_violation")
+        payload = CallTool(
+            ToolId(_text(content["tool_id"])),
+            json.dumps(content["arguments"], sort_keys=True, ensure_ascii=False),
+        )
+    elif kind is ActionType.RESPOND:
         content = _object(item["payload"], {"message"})
         payload = Respond(_text(content["message"]))
     elif kind is ActionType.REQUEST_MORE_CONTEXT:
@@ -149,12 +165,17 @@ def parse_decision(raw: str, max_chars: int) -> ModelDecision:
     return ModelDecision(kind, payload)
 
 
-def validate_brief(proposal: CompleteTask, context: SuppliedContext) -> ResearchBrief:
+def validate_brief(
+    proposal: CompleteTask,
+    context: SuppliedContext,
+    tool_evidence: tuple[Fact, ...] = (),
+) -> ResearchBrief:
     """Exact supplied fact matching, not a general natural-language truth oracle."""
+    evidence = (*context.facts, *tool_evidence)
     expected_gaps = {
         key
         for key in context.required_keys
-        if len({fact.value for fact in context.facts if fact.key == key}) != 1
+        if len({fact.value for fact in evidence if fact.key == key}) != 1
     }
     keys = [fact.key for fact in proposal.findings]
     if (
@@ -163,7 +184,7 @@ def validate_brief(proposal: CompleteTask, context: SuppliedContext) -> Research
         or set(keys) != set(context.required_keys) - expected_gaps
     ):
         raise ModelFailure("unsupported_completion")
-    if any(fact not in context.facts for fact in proposal.findings):
+    if any(fact not in evidence for fact in proposal.findings):
         raise ModelFailure("ungrounded_fact")
     summary = "; ".join(f"{fact.key}: {fact.value}" for fact in proposal.findings)
     if proposal.gaps:

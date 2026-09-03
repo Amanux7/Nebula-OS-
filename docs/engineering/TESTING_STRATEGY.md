@@ -18,6 +18,27 @@ Tests protect domain invariants, tenant isolation, safe side effects, recoverabi
 
 ## Test layers
 
+### Implemented Stage 3 tests
+
+`tests/test_tools.py` and `tests/fixtures/agent_eval/tool_cases.json` add deterministic
+tool-use, no-tool-needed, repeated-read, two-tool, wrong-selection, unauthorized,
+recovery, fabricated-provenance, and injection scenarios. They cover exact grants,
+risk denials, strict argument/output validation (including Unicode/UTF-8 bytes),
+normalized errors, actual async timeout, call budgets, replay and in-flight duplicate
+ownership, parent/run/registry races, coroutine and domain cancellation, immutable
+version history, receipt export/correlation, bounded previews, context overflow,
+same-workspace foreign-run and cross-workspace evidence, and claim/result rollback.
+Tests assert no executor call after preflight rejection and no Task completion from
+a tool result alone. Failures can return to a valid waiting state.
+
+The same existing CI commands include these tests without secrets, live APIs, new
+dependencies, or infrastructure. [Stage 3 report](../STAGE_3_REPORT.md) records local
+results; a remote CI run is not claimed. Timed async tests use generous outer guards;
+fake clocks/IDs and gate-controlled concurrency keep business assertions deterministic.
+Adapter cancellation cooperation and in-memory rollback do not prove crash recovery.
+
+### Target test layers
+
 | Layer | Scope | Representative assertions |
 |---|---|---|
 | Unit tests | Pure domain rules, parsers, transition functions, budget arithmetic | Illegal transitions rejected; permissions narrow; retry classifier correct. |

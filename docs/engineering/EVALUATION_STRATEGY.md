@@ -19,6 +19,22 @@ A unit test asks whether deterministic software obeys a specified contract—for
 
 ## Evaluation dimensions
 
+### Stage 3 tool-selection boundary
+
+`tests/fixtures/agent_eval/tool_cases.json` adds tool_needed, tool_not_needed,
+repeated_request, two_tools, injection, unauthorized_tool, wrong_tool_selection,
+tool_failure_recovery, and fabricated_receipt. These are scripted regression cases,
+not held-out model scores. The tool-enabled evaluator (`receipt-facts-v1`) matches
+exact findings to supplied facts or successful same-run, same-workspace, granted-version
+receipts. It preserves the required-key/gap rules and rejects fabricated citations.
+
+“Was the tool allowed and its request valid?” is enforced deterministically.
+“Was this a good, necessary, efficient tool choice?” remains a future behavioral
+evaluation. An intentional second Action may repeat a read; only replay of the same
+invocation is deduplicated. Budgets bound repetition but do not prove intelligent
+selection. Tool receipts establish observed provenance, not real-world truth,
+freshness, or semantic entailment. No live-model or live-tool evaluation was run.
+
 | Dimension | Question | Candidate measure |
 |---|---|---|
 | Task success | Did the result satisfy acceptance criteria? | Exact/structured checks plus calibrated human rubric. |

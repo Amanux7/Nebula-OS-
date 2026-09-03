@@ -9,6 +9,7 @@ from agent_company_os.domain.agent import (
     Observation,
     SuppliedContext,
 )
+from agent_company_os.domain.tools import ToolVersion
 
 
 @dataclass(frozen=True)
@@ -24,6 +25,7 @@ class AgentModelRequest:
     iteration: int
     max_iterations: int
     schema_version: int = 1
+    available_tools: tuple[ToolVersion, ...] = ()
 
 
 class ModelPort(Protocol):

@@ -14,6 +14,7 @@ from agent_company_os.domain.ids import (
     Version,
     WorkspaceId,
 )
+from agent_company_os.domain.tools import ToolGrant, ToolObservationData
 from agent_company_os.domain.validation import clean_required_text, require_utc
 
 
@@ -34,6 +35,7 @@ class ObservationId(OpaqueId):
 
 
 class ActionType(StrEnum):
+    CALL_TOOL = "call_tool"
     RESPOND = "respond"
     COMPLETE_TASK = "complete_task"
     REQUEST_MORE_CONTEXT = "request_more_context"
@@ -56,8 +58,16 @@ class AgentDefinitionVersion:
     autonomy_ceiling: int = 1
     model_name: str = "scripted-v1"
     schema_version: int = 1
+    allowed_tools: tuple[ToolGrant, ...] = ()
 
     def __post_init__(self) -> None:
+        if (
+            not isinstance(self.allowed_tools, tuple)
+            or len(self.allowed_tools) > 3
+            or any(not isinstance(grant, ToolGrant) for grant in self.allowed_tools)
+            or len(set(grant.tool_id for grant in self.allowed_tools)) != len(self.allowed_tools)
+        ):
+            raise InvariantViolation("tool_grants_unique_exact_versions")
         for value in (self.definition.name, self.role, self.instructions, self.model_name):
             clean_required_text(value, "agent_configuration")
             if len(value) > 4000:
@@ -78,6 +88,8 @@ class RuntimeLimits:
     recent_observations: int = 4
     max_context_chars: int = 16000
     max_response_chars: int = 8000
+    max_tool_calls: int = 5
+    max_calls_per_tool: int = 3
 
     def __post_init__(self) -> None:
         for value, maximum in (
@@ -87,6 +99,8 @@ class RuntimeLimits:
             (self.recent_observations, 20),
             (self.max_context_chars, 64000),
             (self.max_response_chars, 32000),
+            (self.max_tool_calls, 20),
+            (self.max_calls_per_tool, 20),
         ):
             if type(value) is not int or not 1 <= value <= maximum:
                 raise InvariantViolation("runtime_limit_range")
@@ -114,6 +128,8 @@ class SuppliedContext:
     source_texts: tuple[SourceText, ...] = ()
 
     def __post_init__(self) -> None:
+        if any(fact.source_id.startswith("tool_receipt:") for fact in self.facts):
+            raise InvariantViolation("supplied_sources_cannot_impersonate_tool_receipts")
         if not self.required_keys or len(set(self.required_keys)) != len(self.required_keys):
             raise InvariantViolation("required_fact_keys_unique_nonempty")
         if any(
@@ -134,6 +150,7 @@ class SuppliedContext:
 
 
 class ObservationKind(StrEnum):
+    TOOL_RESULT = "tool_result"
     CONTEXT_RECEIVED = "context_received"
     ACTION_ACCEPTED = "action_accepted"
     ACTION_REJECTED = "action_rejected"
@@ -152,10 +169,13 @@ class Observation:
     provenance: str = "runtime"
     trust: str = "validated_runtime_metadata"
     schema_version: int = 1
+    tool_result: ToolObservationData | None = None
 
     def __post_init__(self) -> None:
         if not self.message or len(self.message) > 1000 or self.schema_version != 1:
             raise InvariantViolation("observation_schema_and_size")
+        if (self.kind is ObservationKind.TOOL_RESULT) != (self.tool_result is not None):
+            raise InvariantViolation("tool_observation_payload")
 
 
 @dataclass(frozen=True)

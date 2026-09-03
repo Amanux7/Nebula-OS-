@@ -6,6 +6,28 @@ Agent output, retrieved content, tool output, integration data, and model respon
 
 ## Initial permission model
 
+The broader controls below are the target security design, not all implemented
+capabilities. Stage 3 implements the narrow tool boundary in
+[ADR-006](ADR/ADR-006-tool-runtime.md): exact immutable AgentDefinitionVersion grants,
+workspace-scoped tool registry, action allowlist, read-only risk enforcement,
+schema/byte/time/call limits, and post-I/O version/enablement checks.
+No authenticated API, secret broker, connection/OAuth system, human approval engine,
+transport sandbox, or production telemetry redaction service exists yet.
+
+Stage 3 ToolRisk uses `read_only`, `internal_write`, `external_write`, and `high_risk`;
+only `read_only` executes. This is a coarse initial classification, not an alternative
+implementation of the future R0–R4 matrix. Granting a write class still cannot run it.
+Registry disablement invalidates in-flight results through revision checks; it is
+not a guarantee an upstream process has stopped or a distributed revocation protocol.
+
+Tool-result text is labelled untrusted data, even from trusted fixture configuration.
+An adversarial notes fixture requests database deletion; software rejects the proposed
+unregistered tool without changing grants. Successful receipts are scoped to the run,
+and reserved source prefixes prevent caller/tool data impersonating receipt evidence.
+Raw malformed/oversized outputs and executor exception messages are not stored.
+Future credentials must stay in protected executor configuration, never in tool
+descriptors or model context. No credential fields or secrets are needed in Stage 3.
+
 An authorization request is evaluated over:
 
 ```text

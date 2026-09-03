@@ -2,6 +2,34 @@
 
 These decisions are intentionally unresolved. “Target stage” indicates when evidence is expected, not a deadline to decide prematurely.
 
+## Stage 3 decision updates
+
+The inventory below preserves the original questions; these explicit resolutions
+and narrower remaining questions take precedence:
+
+- OQ-016: ADR-006 selects immutable exact tool grants and four coarse risk classes;
+  only read_only executes. Fine resource scopes, approval defaults, and production
+  permission revocation still need Stage 9/12 evidence.
+- OQ-028 was resolved by ADR-005: AgentRun is a standalone versioned runtime record
+  bound to TaskAttempt. Stage 3 does not reopen that decision.
+- OQ-029 now includes call_tool and typed receipt-backed tool Observations under
+  ADR-006; approval, retrieval, and delegation families remain deferred.
+- OQ-030 gains four minimal tool audit event types and bounded canonical receipts;
+  retention, durable delivery, and process-loss recovery are still open.
+- OQ-021 remains answered by ADR-004 (Python); Stage 3 adds no language or dependency.
+- OQ-022: the custom typed runtime continues to meet this narrow offline scope;
+  no framework or production orchestration strategy is selected.
+
+New questions for later stages:
+
+| ID | Question | Evidence needed | Target stage |
+|---|---|---|---|
+| OQ-032 | How should pending tool claims and unknown outcomes recover after process loss? | Durable transaction/worker-loss fixtures; integration idempotency contracts. | Before production tools |
+| OQ-033 | What receipt and caller-source retention, deletion, redaction, and artifact limits are required? | Privacy requirements, audit needs, real source sizes. Tool snapshots exist; caller-context replacement history is not solved. | Stage 4/13 |
+| OQ-034 | How should source freshness, conflicts, and tool-selection quality be evaluated? | Versioned corpus and calibrated human/live-model evaluations, beyond exact fact matching. | Stage 4/11 |
+| OQ-035 | What isolation and streaming/transport bounds are needed for real executors? | Threat model, adapter conformance, cancellation and allocation failures. In-process fixture limits are not a sandbox. | Before external adapters |
+| OQ-036 | What authenticated principal/resource scopes and revocation linearization are required? | API identity and concurrent policy-change scenarios; current scope/grants assume a trusted caller. | Stage 9/12/13 |
+
 ## Product and MVP
 
 | ID | Question | Why it matters | Evidence needed | Target stage |

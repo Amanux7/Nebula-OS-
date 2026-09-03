@@ -1,6 +1,6 @@
 # Agent Company OS
 
-**Current Stage: Stage 2 — Single-Agent Runtime (scripted-model verification)**
+**Current Stage: Stage 3 — Tool Runtime (offline read-only fixture verification)**
 
 Agent Company OS is a working title for a production-oriented platform for operating an AI-native organization. It is intended to coordinate goals, specialized agents, deterministic workflows, governed tools, shared knowledge, human approvals, and auditable execution—without reducing the product to a collection of chatbots.
 
@@ -10,7 +10,7 @@ Current AI assistants are often isolated, difficult to govern, weakly observable
 
 ## High-level architecture
 
-The conceptual system separates application, runtime, policy, and persistence boundaries. The implemented slice uses Python 3.13, immutable domain entities, typed ports, in-memory adapters, and one bounded single-agent loop. Tools, knowledge retrieval, memory, and multi-agent orchestration remain future work. See [System Architecture](docs/architecture/SYSTEM_ARCHITECTURE.md) and [Domain Model](docs/architecture/DOMAIN_MODEL.md).
+The conceptual system separates application, runtime, policy, and persistence boundaries. The implemented slice uses Python 3.13, immutable domain entities, typed ports, in-memory adapters, one bounded single-agent loop, and two read-only fixture tools. Knowledge retrieval, memory, and multi-agent orchestration remain future work. See [System Architecture](docs/architecture/SYSTEM_ARCHITECTURE.md) and [Domain Model](docs/architecture/DOMAIN_MODEL.md).
 
 ## Documentation map
 
@@ -28,14 +28,18 @@ Build trust and visibility before autonomy. Keep state explicit, boundaries type
 Stage 1 implements deterministic Workspace/Goal/Task/TaskAttempt/Execution state,
 version guards, and audit history. Stage 2 adds immutable AgentDefinition versions,
 AgentRun, structured decisions, internal Actions/Observations, policy validation,
-bounded working state, and wait/resume. The Research Brief Agent operates only on
-supplied facts. Its default adapter is scripted, not a live AI model.
+bounded working state, and wait/resume. Stage 3 adds exact-version tool grants,
+Company Fact Lookup and Source Fact Lookup, strict validation, bounded execution,
+immutable receipts, and grounded tool Observations. The Research Brief Agent can
+optionally use these tools. Its model adapter remains scripted, not a live AI model.
 
 Read [Stage 1 verification](docs/STAGE_1_REPORT.md), [Stage 2 report](docs/STAGE_2_REPORT.md),
 [language decision](docs/architecture/ADR/ADR-004-implementation-language.md), and
 [runtime decision](docs/architecture/ADR/ADR-005-single-agent-runtime.md).
-No paid calls or credentials are required. No Tool Runtime, RAG, Memory, MCP,
-multi-agent system, UI, or production persistence is implemented.
+Read the [Stage 3 report](docs/STAGE_3_REPORT.md) and
+[Tool Runtime decision](docs/architecture/ADR/ADR-006-tool-runtime.md).
+No paid calls or credentials are required. No external write tools, live network
+adapter, RAG, Memory, MCP, multi-agent system, UI, or production persistence exists.
 
 ## Development
 
@@ -56,4 +60,11 @@ Run `python -m pytest tests/test_runtime.py -q` in the activated environment for
 the single-agent demo/failure suite. `test_grounded_completion_fixtures` proves
 completion; `test_wait_supply_resume_same_identity` proves context resumption.
 
-The next proposed milestone is **Stage 3: Tool Runtime**. It has not been started.
+Run `python -m pytest tests/test_tools.py -q` for the tool-use scenarios, race tests,
+and adversarial fixtures. Defaults: 5 tool calls/run, 3/tool, 3 seconds/tool,
+2,048 input bytes, 8,192 output bytes, and no automatic retry; existing iteration
+and run-deadline limits also apply. Receipts prove observed data, not source truth.
+
+The next proposed milestone is **Stage 4: Company Brain / Knowledge Retrieval**.
+It has not been started. Passing offline tests does not establish live-model quality
+or production readiness.

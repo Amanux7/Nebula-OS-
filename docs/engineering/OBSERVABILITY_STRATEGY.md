@@ -6,6 +6,28 @@ Observability must let users and operators answer: what ran, under which version
 
 ## Correlation model
 
+### Implemented Stage 3 evidence
+
+RuntimeStore now records `tool_invocation_started`, `tool_request_rejected`,
+`tool_receipt_recorded`, and `tool_result_observed` alongside Action/model events.
+They remain AgentRun-subject audit Events; invocation/receipt/Observation references
+provide drill-down rather than introducing a generic ExecutionStep. Receipt events
+correlate workspace, run, Execution, TaskAttempt, invocation, exact tool version,
+status/error, duration_ms, input_bytes, output_bytes, and retry_count (zero).
+Started/rejected events also bind the Action; Observations bind Action and receipt.
+
+Input size is normalized validated UTF-8 bytes; output size is the accepted bounded
+payload bytes, zero for failed/discarded results. These are not network traffic metrics.
+Canonical receipts retain bounded validated snapshots separately from recent model
+context; `serialize_receipt` provides an explicit audit export. Raw malformed/oversized
+payloads and exception text are not logged. Terminal cancellation can gain a late
+receipt Event without changing run/parent state. Unknown outcomes are never success.
+
+No telemetry exporter, metrics service, production retention, tamper-proof storage,
+or UI is implemented. The broader signal/view design below remains future scope.
+
+### Target correlation fields
+
 Every signal carries `workspace_id` in protected context and, when applicable:
 
 ```text
@@ -14,7 +36,7 @@ agent_id, agent_definition_version
 goal_id, task_id, workflow_id, workflow_version
 task_attempt_id, agent_run_id
 action_id, observation_id, state_transition_id, event_id
-tool_id, tool_version, tool_call_id
+tool_id, tool_version, tool_invocation_id, tool_receipt_id
 approval_request_id, evaluation_id
 ```
 

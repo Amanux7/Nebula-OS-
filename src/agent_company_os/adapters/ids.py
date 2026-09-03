@@ -13,9 +13,16 @@ from agent_company_os.domain.ids import (
     TaskId,
     WorkspaceId,
 )
+from agent_company_os.domain.tools import ToolInvocationId, ToolReceiptId
 
 
 class SystemIdGenerator:
+    def tool_invocation_id(self) -> ToolInvocationId:
+        return ToolInvocationId(str(uuid4()))
+
+    def tool_receipt_id(self) -> ToolReceiptId:
+        return ToolReceiptId(str(uuid4()))
+
     def agent_run_id(self) -> AgentRunId:
         return AgentRunId(str(uuid4()))
 
@@ -48,6 +55,12 @@ class SystemIdGenerator:
 
 
 class DeterministicIdGenerator:
+    def tool_invocation_id(self) -> ToolInvocationId:
+        return ToolInvocationId(self._next("tool-invocation"))
+
+    def tool_receipt_id(self) -> ToolReceiptId:
+        return ToolReceiptId(self._next("tool-receipt"))
+
     def agent_run_id(self) -> AgentRunId:
         return AgentRunId(self._next("agent-run"))
 
