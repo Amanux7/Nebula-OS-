@@ -1,70 +1,370 @@
 # Agent Company OS
 
-**Current Stage: Stage 3 — Tool Runtime (offline read-only fixture verification)**
+### A governed runtime for AI-native work
 
-Agent Company OS is a working title for a production-oriented platform for operating an AI-native organization. It is intended to coordinate goals, specialized agents, deterministic workflows, governed tools, shared knowledge, human approvals, and auditable execution—without reducing the product to a collection of chatbots.
+[![CI](https://github.com/Amanux7/Nebula-OS-/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Amanux7/Nebula-OS-/actions/workflows/ci.yml)
+[![Python 3.13](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)](pyproject.toml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-## Why it exists
+Turn business goals into bounded, inspectable work—with explicit state, narrowly
+scoped capabilities, and evidence behind every accepted result.
 
-Current AI assistants are often isolated, difficult to govern, weakly observable, and hard to reuse. Agent Company OS aims to provide explicit organizational, runtime, permission, and evaluation structures so that useful autonomy can be introduced safely.
+> **AI for judgment. Software for guarantees.**
 
-## High-level architecture
+**Current milestone: Stage 3 — Tool Runtime.** The repository implements a
+deterministic domain foundation, a single-agent loop driven by a scripted model,
+and two read-only fixture tools. It is an early-stage engineering foundation,
+not a deployed autonomous company or a production-ready AI service.
 
-The conceptual system separates application, runtime, policy, and persistence boundaries. The implemented slice uses Python 3.13, immutable domain entities, typed ports, in-memory adapters, one bounded single-agent loop, and two read-only fixture tools. Knowledge retrieval, memory, and multi-agent orchestration remain future work. See [System Architecture](docs/architecture/SYSTEM_ARCHITECTURE.md) and [Domain Model](docs/architecture/DOMAIN_MODEL.md).
+[Get started](#getting-started) · [Architecture](#architecture) ·
+[Execution flow](#tool-execution-flow) · [Roadmap](#roadmap) ·
+[Documentation](#documentation) · [Contribute](#contributing)
 
-## Documentation map
+---
 
-- [Product requirements](docs/product/PRD.md), [personas](docs/product/PERSONAS.md), [user journeys](docs/product/USER_JOURNEYS.md), [MVP scope](docs/product/MVP_SCOPE.md), and [success metrics](docs/product/SUCCESS_METRICS.md)
-- [Architecture](docs/architecture/SYSTEM_ARCHITECTURE.md), [runtime](docs/architecture/AGENT_RUNTIME_ARCHITECTURE.md), [data](docs/architecture/DATA_ARCHITECTURE.md), [security](docs/architecture/SECURITY_AND_PERMISSIONS.md), [ADR-001](docs/architecture/ADR/ADR-001-architecture-principles.md), [ADR-002](docs/architecture/ADR/ADR-002-execution-domain-semantics.md), and [ADR-003](docs/architecture/ADR/ADR-003-agent-definition-and-runtime-identity.md)
-- [Engineering principles](docs/engineering/ENGINEERING_PRINCIPLES.md), [roadmap](docs/engineering/DEVELOPMENT_ROADMAP.md), [testing](docs/engineering/TESTING_STRATEGY.md), [evaluation](docs/engineering/EVALUATION_STRATEGY.md), [observability](docs/engineering/OBSERVABILITY_STRATEGY.md), and [risk register](docs/engineering/RISK_REGISTER.md)
-- [Glossary](docs/project/GLOSSARY.md), [assumptions](docs/project/ASSUMPTIONS.md), [open questions](docs/project/OPEN_QUESTIONS.md), [Stage 0 report](docs/STAGE_0_REPORT.md), and [Stage 0.1 refinement report](docs/STAGE_0_1_REFINEMENT_REPORT.md)
+## About the project
 
-## Development philosophy
+Agent Company OS is the working product name for the project in the **Nebula-OS-**
+repository. Its mission is to make AI-assisted business work accountable: define
+the outcome, constrain the work, control access, preserve evidence, and let people
+inspect what happened.
 
-Build trust and visibility before autonomy. Keep state explicit, boundaries typed, permissions least-privileged, model outputs validated, and deterministic work deterministic. Treat failure, approval, auditability, and evaluation as runtime concerns rather than UI afterthoughts.
+The long-term vision is an operating layer for an AI-native organization—not a
+collection of disconnected chatbots. Specialized agents and deterministic workflows
+would share governed company knowledge, collaborate on bounded tasks, and escalate
+consequential decisions to people. Those organizational capabilities are a roadmap,
+not a claim about the current implementation.
 
-## Current status and next milestone
+| Project information | Details |
+|---|---|
+| Working product name | Agent Company OS |
+| Repository | [Amanux7/Nebula-OS-](https://github.com/Amanux7/Nebula-OS-) |
+| Repository owner | [Amanux7](https://github.com/Amanux7) |
+| License | [MIT](LICENSE) |
+| Current focus | Safe execution, tool permissions, provenance, and deterministic verification |
+| Intended users | Founders, startup teams, operations leaders, automation builders, agencies, and SMBs |
+| Reference workflow | Evidence-backed research and structured business briefs |
 
-Stage 1 implements deterministic Workspace/Goal/Task/TaskAttempt/Execution state,
-version guards, and audit history. Stage 2 adds immutable AgentDefinition versions,
-AgentRun, structured decisions, internal Actions/Observations, policy validation,
-bounded working state, and wait/resume. Stage 3 adds exact-version tool grants,
-Company Fact Lookup and Source Fact Lookup, strict validation, bounded execution,
-immutable receipts, and grounded tool Observations. The Research Brief Agent can
-optionally use these tools. Its model adapter remains scripted, not a live AI model.
+These users and workflows are product hypotheses under validation. See the
+[PRD](docs/product/PRD.md) and [personas](docs/product/PERSONAS.md) for the product
+context; no commercial traction or incorporated-company status is implied.
 
-Read [Stage 1 verification](docs/STAGE_1_REPORT.md), [Stage 2 report](docs/STAGE_2_REPORT.md),
-[language decision](docs/architecture/ADR/ADR-004-implementation-language.md), and
-[runtime decision](docs/architecture/ADR/ADR-005-single-agent-runtime.md).
-Read the [Stage 3 report](docs/STAGE_3_REPORT.md) and
-[Tool Runtime decision](docs/architecture/ADR/ADR-006-tool-runtime.md).
-No paid calls or credentials are required. No external write tools, live network
-adapter, RAG, Memory, MCP, multi-agent system, UI, or production persistence exists.
+## Why this exists
 
-## Development
+Useful automation needs more than a capable model. It needs clear answers to:
 
-Python 3.13, from the repository root:
+- **Authority:** Which operations may this agent request, in this workspace?
+- **State:** What is running, waiting, completed, failed, or cancelled?
+- **Evidence:** Which inputs, versions, and observed results support the output?
+- **Control:** What prevents duplicate execution, stale updates, or unbounded loops?
+- **Recovery:** What remains inspectable when a model, tool, or persistence step fails?
 
-```powershell
+Agent Company OS makes those questions software responsibilities. A model proposal
+cannot grant permissions, bypass domain invariants, or certify its own success.
+
+## What works today
+
+| Capability | Implemented behavior |
+|---|---|
+| Deterministic domain | Workspace, Goal, Task, TaskAttempt, and Execution lifecycles with typed errors and version guards |
+| Configuration history | Immutable AgentDefinition versions bound to each AgentRun |
+| Single-agent runtime | Structured decisions, bounded working state, wait/resume, cancellation, and a scripted FakeModel |
+| Controlled tools | Exact-version registry, explicit grants, read-only risk enforcement, strict inputs and outputs |
+| Execution evidence | Immutable ToolReceipts, typed Observations, audit Events, and explicit receipt export |
+| Grounded completion | Exact findings checked against supplied facts or successful same-run tool evidence |
+| Failure handling | Timeouts, budgets, duplicate-invocation protection, stale-result rejection, and atomic rollback |
+| Verification | 155 passing tests at the Stage 3 gate, plus formatting, lint, and strict type checks |
+
+The only supplied agent type is the **Research Brief Agent**. It can operate on
+approved supplied facts or receive an immutable definition upgrade granting the
+two fixture tools. Its model responses are scripted; no live LLM provider is wired in.
+
+## Architecture
+
+The implemented architecture is a **modular Python application**, not a microservice
+deployment. The diagram shows logical responsibilities and adapter boundaries.
+
+~~~mermaid
+flowchart TD
+    caller["Application caller or tests"] --> domainService["DomainService"]
+    caller --> agentRuntime["AgentRuntimeService"]
+    agentRuntime -->|"Domain commands"| domainService
+    domainService -->|"Enforces invariants"| domain["Typed domain entities"]
+    agentRuntime -->|"ModelPort"| model["Scripted FakeModel"]
+    agentRuntime -->|"ToolRuntimePort"| toolRuntime["ToolRuntimeService"]
+    toolRuntime -->|"Resolve exact grants"| registry["ToolRegistry"]
+    toolRuntime -->|"ToolExecutor"| fixtures["Read-only fixture tools"]
+    domainService -->|"DomainStore"| state["In-memory domain state"]
+    agentRuntime -->|"RuntimeStore"| history["In-memory runtime records"]
+    toolRuntime -->|"Claims and receipts"| history
+    history ---|"Shared rollback boundary"| state
+~~~
+
+### Separation of responsibilities
+
+- **Domain:** legal lifecycles, entity relationships, workspace scope, and historical integrity.
+- **Application:** domain use cases, agent coordination, context assembly, grounding, and tool execution policy.
+- **Ports:** typed seams for clocks, identifiers, models, tools, registries, and storage.
+- **Adapters:** in-memory persistence, system/test clocks and IDs, scripted models, and fixture executors.
+
+AgentRuntimeService coordinates decisions; ToolRuntimeService controls capabilities.
+Neither model text nor tool-returned content becomes an authority boundary.
+Canonical state is stored directly, with append-only history—it is **not event sourcing**.
+
+The [System Architecture](docs/architecture/SYSTEM_ARCHITECTURE.md) describes the
+broader target design. Its UI, planning, knowledge, memory, and infrastructure layers
+must not be mistaken for implemented services.
+
+### Domain vocabulary
+
+| Concept | Meaning |
+|---|---|
+| Goal | A desired outcome, not an implementation step |
+| Task | Bounded logical work contributing to a Goal |
+| TaskAttempt | One attempt to perform a Task; retries preserve prior history |
+| Execution | A bounded root attempt containing task execution activity |
+| AgentDefinitionVersion | Immutable behavior and capability configuration |
+| AgentRun | Runtime participation of that exact configuration for a TaskAttempt |
+| Action | A requested operation—not proof that it happened |
+| Observation | Information returned to the runtime, with provenance and trust |
+| ToolReceipt | Immutable evidence of what a tool invocation returned or how it failed |
+
+See the [Domain Model](docs/architecture/DOMAIN_MODEL.md) and
+[Glossary](docs/project/GLOSSARY.md) for complete definitions.
+
+## Tool execution flow
+
+The model requests a capability; deterministic software decides whether it runs.
+This flow shows the tool branch of the agent loop. Schema or runtime faults and
+exhausted limits use the runtime's failure path rather than continuing indefinitely.
+
+~~~mermaid
+flowchart TD
+    proposal["Structured call_tool Action"] --> gate{"Authorized and valid?"}
+    gate -->|"No"| rejected["Record rejection Observation"]
+    gate -->|"Yes, within limits"| claim["Persist invocation claim"]
+    claim --> execute["Execute outside transaction lock"]
+    execute --> check["Validate result and current state"]
+    check --> current{"Current and active?"}
+    current -->|"No"| stale["Audit discarded late result"]
+    current -->|"Yes"| receipt["Commit success or failure receipt"]
+    receipt --> observation["Create bounded Observation"]
+    observation --> nextDecision["Next model decision"]
+    rejected --> nextDecision
+    nextDecision --> completion{"Proposes completion?"}
+    completion -->|"Yes"| grounding{"Grounding passes?"}
+    grounding -->|"Yes"| completed["Commit validated completion"]
+    grounding -->|"No"| failed["Reject unsupported completion"]
+    completion -->|"No"| continueRun["Continue or wait within limits"]
+~~~
+
+Successful tool execution does **not** automatically complete the Task. A subsequent
+`complete_task` decision must pass grounding and domain validation. Goal satisfaction
+is a separate explicit operation.
+
+### Current tool catalog
+
+| Tool | Input | Result |
+|---|---|---|
+| Company Fact Lookup | `company_name` | Approved fixture facts for that company |
+| Source Fact Lookup | `source_id` and unique `keys` | Matching approved source facts |
+
+Both are deterministic, read-only, and offline. A fake executor additionally supports
+scripted errors, timeouts, blocked calls, and captured inputs for tests.
+
+### Safety defaults
+
+| Control | Default |
+|---|---|
+| Model iterations | 5 per run |
+| Total run deadline | 60 seconds |
+| Model timeout | 5 seconds per call |
+| Tool budget | 5 calls per run; 3 per tool |
+| Tool timeout | 3 seconds, capped by the remaining run deadline |
+| Tool payloads | 2,048 input bytes; 8,192 output bytes |
+| Automatic retries | Disabled |
+| Context | Last 4 Observations; 16,000 text characters |
+| Receipt preview | Up to 5 facts per Observation; up to 10 in the canonical receipt |
+
+Each tool request consumes a model iteration. Using all five default iterations on
+tools leaves no iteration for completion. Limits remain in force across wait/resume.
+
+Exact replay of the same host-generated Action does not execute its tool again.
+A deliberate new Action with the same arguments is a new budgeted invocation.
+This is local idempotency, not distributed exactly-once execution.
+
+## Getting started
+
+### Prerequisites
+
+- Git and Python **3.13** for the tested development environment.
+- No API keys, database, containers, or external services are needed to run the tests.
+- Installing development dependencies requires package-download access.
+
+Clone the repository:
+
+~~~bash
+git clone https://github.com/Amanux7/Nebula-OS-.git
+cd Nebula-OS-
+~~~
+
+**Windows / PowerShell**
+
+~~~powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
-.\.venv\Scripts\python.exe -m ruff format --check src tests
-.\.venv\Scripts\python.exe -m ruff check src tests
-.\.venv\Scripts\python.exe -m mypy
 .\.venv\Scripts\python.exe -m pytest -q
-```
+~~~
 
-On macOS/Linux use `.venv/bin/python` instead. Installation downloads development
-dependencies; the suite itself is offline, deterministic, and secret-free.
-Run `python -m pytest tests/test_runtime.py -q` in the activated environment for
-the single-agent demo/failure suite. `test_grounded_completion_fixtures` proves
-completion; `test_wait_supply_resume_same_identity` proves context resumption.
+**macOS / Linux**
 
-Run `python -m pytest tests/test_tools.py -q` for the tool-use scenarios, race tests,
-and adversarial fixtures. Defaults: 5 tool calls/run, 3/tool, 3 seconds/tool,
-2,048 input bytes, 8,192 output bytes, and no automatic retry; existing iteration
-and run-deadline limits also apply. Receipts prove observed data, not source truth.
+~~~bash
+python3.13 -m venv .venv
+.venv/bin/python -m pip install -e ".[dev]"
+.venv/bin/python -m pytest -q
+~~~
 
-The next proposed milestone is **Stage 4: Company Brain / Knowledge Retrieval**.
-It has not been started. Passing offline tests does not establish live-model quality
-or production readiness.
+There is no web server, dashboard, or deployment command in this stage. The
+executable entry points are the typed application services and integration tests.
+
+### Run the deterministic demos
+
+Using the virtual environment's Python executable:
+
+~~~bash
+python -m pytest tests/test_runtime.py -q
+python -m pytest tests/test_tools.py -k deterministic_tool_eval -v
+~~~
+
+On Windows, substitute `.\.venv\Scripts\python.exe` for `python`; on macOS/Linux,
+use `.venv/bin/python`, unless the virtual environment is already activated.
+
+The tool scenarios create a Workspace, Goal, Task, Execution, and TaskAttempt; start
+the Research Brief Agent; execute permitted fixture lookups; record receipts; and
+validate an explicit completion decision. Companion cases cover no-tool-needed,
+repeated-read, and two-tool behavior. No live model or network call is made.
+
+## Development and quality gates
+
+Run all checks with the virtual environment's Python:
+
+~~~bash
+python -m ruff format --check src tests
+python -m ruff check src tests
+python -m mypy
+python -m pytest -q
+git diff --check
+~~~
+
+The existing [GitHub Actions workflow](.github/workflows/ci.yml) runs formatting,
+lint, type checking, and tests on pushes and pull requests. The test phase is offline
+and secret-free; dependency installation still uses package downloads. The CI badge
+above tracks `main`, not unmerged pull-request branches.
+
+The [Stage 3 report](docs/STAGE_3_REPORT.md) records **155 passing tests**:
+87 existing tests and 68 Stage 3 cases. Coverage includes malformed inputs/outputs,
+permission denials, foreign-workspace references, forged provenance, injection
+attempts, budgets, cancellation races, stale versions, and claim/result rollback.
+Passing scripted tests establishes software behavior—not live-model answer quality.
+
+## Repository structure
+
+~~~text
+.
+├── src/agent_company_os/
+│   ├── domain/              # Entities, value objects, state and evidence contracts
+│   ├── application/         # Domain use cases, agent and tool runtime services
+│   ├── ports/               # Typed model, tool, clock, ID and storage boundaries
+│   ├── adapters/            # In-memory stores, scripted doubles, fixture tools
+│   └── serialization.py     # Explicit domain boundary serialization
+├── tests/
+│   ├── fixtures/agent_eval/ # Deterministic and adversarial evaluation fixtures
+│   ├── test_runtime.py      # Single-agent scenarios and failure paths
+│   └── test_tools.py        # Tool contracts, safety, provenance and race tests
+├── docs/
+│   ├── product/             # Requirements, personas, scope and success criteria
+│   ├── architecture/        # Domain, runtime, security and architecture decisions
+│   ├── engineering/         # Roadmap, testing, evaluation and observability
+│   └── project/             # Glossary, assumptions and open questions
+├── .github/workflows/ci.yml
+├── pyproject.toml
+└── LICENSE
+~~~
+
+## Roadmap
+
+| Stage | Focus | Status |
+|---|---|---|
+| 0 | Product and architecture foundation | Documented |
+| 0.1 | Execution semantics and architectural refinement | Documented |
+| 1 | Deterministic domain foundation | Implemented and verified |
+| 2 | Single-agent runtime | Verified with a scripted model |
+| 3 | Controlled read-only Tool Runtime | Implemented and verified offline |
+| 4 | Company Brain / Knowledge Retrieval | Next proposed milestone; not started |
+| 5 | Governed state and memory | Planned |
+| 6–9 | Orchestration, communication, organization, and human approval | Planned |
+| 10–13 | Observability UI, evaluation hardening, integrations, and production | Planned |
+
+Stages are evidence gates, not release dates. Planning may eventually be deterministic,
+agentic, or hybrid; no orchestrator or agent framework has been selected by default.
+See the [Development Roadmap](docs/engineering/DEVELOPMENT_ROADMAP.md).
+
+## Security and known limitations
+
+- **No external writes:** no email, Slack, database mutation, shell, filesystem,
+  browser, payment, or purchase tools are implemented.
+- **No live AI or integrations:** no live model provider, OAuth connector, or MCP runtime.
+- **No knowledge or memory system yet:** no RAG, embeddings, Company Brain,
+  long-term memory, or multi-agent communication.
+- **In-memory persistence:** history disappears on process exit; durable recovery
+  and production retention/deletion policies remain unresolved.
+- **Cooperative adapters:** async timeouts require nonblocking, cancellation-aware
+  executors. The runtime is not a sandbox for hostile Python code.
+- **Provenance is not truth:** receipts establish observed inputs and outputs,
+  not source correctness, freshness, or semantic entailment.
+- **Trusted application callers:** production authentication, fine-grained resource
+  scopes, approval enforcement, and operational hardening remain future work.
+
+Tool output is data, never an instruction to broaden authority. Credentials must
+remain outside model context when future integrations are introduced. Read the
+[security architecture](docs/architecture/SECURITY_AND_PERMISSIONS.md),
+[risk register](docs/engineering/RISK_REGISTER.md), and
+[open questions](docs/project/OPEN_QUESTIONS.md) before extending the runtime.
+
+## Documentation
+
+| Start here | References |
+|---|---|
+| Product and company vision | [PRD](docs/product/PRD.md), [MVP scope](docs/product/MVP_SCOPE.md), [user journeys](docs/product/USER_JOURNEYS.md), [success metrics](docs/product/SUCCESS_METRICS.md) |
+| Domain and system design | [Domain Model](docs/architecture/DOMAIN_MODEL.md), [System Architecture](docs/architecture/SYSTEM_ARCHITECTURE.md), [Agent Runtime](docs/architecture/AGENT_RUNTIME_ARCHITECTURE.md), [Data Architecture](docs/architecture/DATA_ARCHITECTURE.md) |
+| Engineering standards | [Principles](docs/engineering/ENGINEERING_PRINCIPLES.md), [testing](docs/engineering/TESTING_STRATEGY.md), [evaluation](docs/engineering/EVALUATION_STRATEGY.md), [observability](docs/engineering/OBSERVABILITY_STRATEGY.md) |
+| Shared terminology | [Glossary](docs/project/GLOSSARY.md), [assumptions](docs/project/ASSUMPTIONS.md), [open questions](docs/project/OPEN_QUESTIONS.md) |
+| Implementation evidence | [Stage 1](docs/STAGE_1_REPORT.md), [Stage 2](docs/STAGE_2_REPORT.md), [Stage 3](docs/STAGE_3_REPORT.md) |
+| Foundation history | [Stage 0](docs/STAGE_0_REPORT.md), [Stage 0.1](docs/STAGE_0_1_REFINEMENT_REPORT.md) |
+
+Key decisions: [architecture principles](docs/architecture/ADR/ADR-001-architecture-principles.md),
+[execution semantics](docs/architecture/ADR/ADR-002-execution-domain-semantics.md),
+[agent identity](docs/architecture/ADR/ADR-003-agent-definition-and-runtime-identity.md),
+[Python selection](docs/architecture/ADR/ADR-004-implementation-language.md),
+[single-agent protocol](docs/architecture/ADR/ADR-005-single-agent-runtime.md), and
+[Tool Runtime](docs/architecture/ADR/ADR-006-tool-runtime.md).
+
+## Contributing
+
+Keep changes focused on a demonstrated requirement or invariant. Start with the
+relevant architecture decision and stage boundary, then include deterministic tests
+and documentation for behavior changes. Material architecture changes need a new ADR;
+do not silently rewrite accepted decisions.
+
+Run the quality checks above before opening a pull request. Explain the change,
+verification results, security implications, and remaining limitations so reviewers
+can assess the evidence. Do not commit credentials or sensitive customer data.
+
+Use [GitHub Issues](https://github.com/Amanux7/Nebula-OS-/issues) for reproducible bugs
+and scoped proposals, and [Pull Requests](https://github.com/Amanux7/Nebula-OS-/pulls)
+for code review. Avoid posting secrets or sensitive vulnerability details publicly.
+
+## License
+
+Released under the [MIT License](LICENSE). Copyright notice and terms are included
+in the license file.
