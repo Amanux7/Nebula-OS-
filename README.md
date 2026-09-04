@@ -367,6 +367,21 @@ lint, type checking, and tests on pushes and pull requests. The test phase is of
 and secret-free; dependency installation still uses package downloads. The CI badge
 above tracks `main`, not unmerged pull-request branches.
 
+### Review workflow
+
+Changes are developed on focused `codex/*` branches and reviewed through GitHub pull
+requests. Each pull request should include a concise scope statement, linked ADRs or
+requirements for architectural changes, deterministic test evidence, security and
+data-boundary notes, and explicit deferred work. Reviewers can reproduce the local gate
+with the commands above; CI repeats the same checks without secrets, paid APIs, live
+models, or external services.
+
+The current Stage 6 branch is
+[`codex/stage-6-orchestration`](https://github.com/Amanux7/Nebula-OS-/tree/codex/stage-6-orchestration).
+Use the repository's [open pull requests](https://github.com/Amanux7/Nebula-OS-/pulls)
+page to open or review the change. The [Stage 6 report](docs/STAGE_6_REPORT.md)
+summarizes the implementation, verification results, risks, and deferred Stage 7 work.
+
 The [Stage 6 report](docs/STAGE_6_REPORT.md) records **286 passing tests**, including
 40 orchestration cases covering DAG validation, scheduling, exact-version eligibility,
 dependency blocking, retries, redelegation, replanning, cancellation, stale versions,
