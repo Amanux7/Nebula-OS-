@@ -1,5 +1,22 @@
 # System Architecture
 
+## Implemented Stage 6 orchestration boundary
+
+`OrchestrationService` is an application-layer coordinator above the existing domain
+and Agent Runtime. It invokes a replaceable `OrchestrationStrategyPort`, treats the
+returned `PlanProposal` as untrusted, validates it in deterministic domain code, and
+materializes an immutable accepted `PlanVersion` through normal Task/Execution use
+cases. `AgentSelector`, `ResultAggregator`, and `OrchestrationStore` are separate ports.
+
+The supplied production-shaped strategy is deterministic (`ResearchBriefPlanStrategy`);
+the second adapter is a scripted fake for conformance and failure tests. No model-driven
+planner is implied. The planner cannot write canonical state, select beyond published
+capabilities/grants, widen permissions, execute tools, or mark Goals complete.
+Dependency scheduling, bounds, stale-version guards, selection, retries, replan history,
+and completion are software guarantees. The Stage 6 adapter is in-process and shares
+the atomic in-memory rollback boundary; queues, distributed workers, leases, and durable
+recovery remain deferred.
+
 ## Purpose and constraints
 
 ### Implemented Stage 5 boundary

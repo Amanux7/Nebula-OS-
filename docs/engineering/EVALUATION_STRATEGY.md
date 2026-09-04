@@ -1,5 +1,15 @@
 # Agent Evaluation Strategy
 
+## Stage 6 orchestration evaluation
+
+Stage 6 evaluates software semantics, not model planning quality. The fixture set covers
+plan validity, scheduling, eligibility, authority narrowing, retries, replanning,
+cancellation, rollback, completion, and lineage. The deterministic strategy and scripted
+fake both traverse the same port and validation path. These cases prove bounds and
+invariants; they are not evidence that an LLM can produce useful plans, select optimal
+agents, recover semantically, or improve business outcomes. Those claims require
+versioned live-model and human-reviewed datasets in a later stage.
+
 ## Stage 5 memory evaluation
 
 `tests/fixtures/agent_eval/memory_cases.json` is the initial versioned offline set. It

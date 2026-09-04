@@ -1,5 +1,16 @@
 # Testing Strategy
 
+## Stage 6 orchestration gate
+
+The deterministic Stage 6 suite covers valid linear and parallel plans, cycles, unknown
+dependencies, excessive size, idempotent materialization, immutable plan history,
+replanning, stable agent selection, no-eligible-agent waiting, disabled or mismatched
+agents, dependency blocking, real AgentRuntime delegation, failure/retry/redelegation,
+budget exhaustion, stale Goal versions, cancellation, atomic rollback, completion, and
+exact lineage. Adversarial cases verify cross-workspace rejection, instruction-like plan
+text, and result content that attempts to grant itself authority. A versioned fixture
+file names the A–AC evaluation cases; all execution remains offline and deterministic.
+
 ## Stage 5 governed-memory gate
 
 The offline suite adds deterministic tests for candidate policy/review, episodic and

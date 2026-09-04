@@ -15,10 +15,24 @@ from agent_company_os.domain.ids import (
 )
 from agent_company_os.domain.knowledge import EvidencePackId, KnowledgeSourceId
 from agent_company_os.domain.memory import MemoryCandidateId, MemoryContextPackId, MemoryEntryId
+from agent_company_os.domain.orchestration import (
+    DelegationId,
+    OrchestrationPlanId,
+    OrchestrationRunId,
+)
 from agent_company_os.domain.tools import ToolInvocationId, ToolReceiptId
 
 
 class SystemIdGenerator:
+    def orchestration_run_id(self) -> OrchestrationRunId:
+        return OrchestrationRunId(str(uuid4()))
+
+    def orchestration_plan_id(self) -> OrchestrationPlanId:
+        return OrchestrationPlanId(str(uuid4()))
+
+    def delegation_id(self) -> DelegationId:
+        return DelegationId(str(uuid4()))
+
     def memory_candidate_id(self) -> MemoryCandidateId:
         return MemoryCandidateId(str(uuid4()))
 
@@ -72,6 +86,15 @@ class SystemIdGenerator:
 
 
 class DeterministicIdGenerator:
+    def orchestration_run_id(self) -> OrchestrationRunId:
+        return OrchestrationRunId(self._next("orchestration-run"))
+
+    def orchestration_plan_id(self) -> OrchestrationPlanId:
+        return OrchestrationPlanId(self._next("orchestration-plan"))
+
+    def delegation_id(self) -> DelegationId:
+        return DelegationId(self._next("delegation"))
+
     def memory_candidate_id(self) -> MemoryCandidateId:
         return MemoryCandidateId(self._next("memory-candidate"))
 

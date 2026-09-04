@@ -11,10 +11,10 @@ scoped capabilities, and evidence behind every accepted result.
 
 > **AI for judgment. Software for guarantees.**
 
-**Current milestone: Stage 5 — Governed Memory.** The repository implements a
-deterministic domain foundation, a single-agent loop driven by a scripted model,
-two read-only fixture tools, bounded source-aware Knowledge retrieval, and
-human-reviewed scoped Memory.
+**Current milestone: Stage 6 — Replaceable Orchestration and Delegation.** The
+repository implements a deterministic domain foundation, a bounded single-agent
+runtime, controlled read-only tools, source-aware Knowledge, reviewed scoped Memory,
+and a replaceable orchestration layer that validates plans and delegates ready work.
 It is an early-stage engineering foundation,
 not a deployed autonomous company or a production-ready AI service.
 
@@ -43,7 +43,7 @@ not a claim about the current implementation.
 | Repository | [Amanux7/Nebula-OS-](https://github.com/Amanux7/Nebula-OS-) |
 | Repository owner | [Amanux7](https://github.com/Amanux7) |
 | License | [MIT](LICENSE) |
-| Current focus | Safe execution, authoritative evidence, reviewed memory, provenance, and deterministic verification |
+| Current focus | Bounded planning, deterministic delegation, safe execution, evidence, provenance, and verification |
 | Intended users | Founders, startup teams, operations leaders, automation builders, agencies, and SMBs |
 | Reference workflow | Evidence-backed research and structured business briefs |
 
@@ -75,9 +75,10 @@ cannot grant permissions, bypass domain invariants, or certify its own success.
 | Execution evidence | Immutable ToolReceipts, typed Observations, audit Events, and explicit receipt export |
 | Company Brain | Versioned text/Markdown/structured facts, source grants, lexical retrieval, and immutable EvidencePacks |
 | Governed Memory | Host-derived candidates, mandatory human review, scoped Episodic/Semantic entries, lifecycle controls, and immutable MemoryContextPacks |
+| Replaceable orchestration | Validated immutable plan versions, one-time materialization, dependency readiness, deterministic agent selection, bounded replan/retry/delegation, and explicit result lineage |
 | Grounded completion | Exact findings checked against supplied facts, successful tool receipts, or active same-run knowledge evidence |
 | Failure handling | Timeouts, budgets, duplicate-invocation protection, stale-result rejection, and atomic rollback |
-| Verification | 246 passing tests at the Stage 5 gate, plus formatting, lint, and strict type checks |
+| Verification | 286 passing tests at the Stage 6 gate, plus formatting, lint, and strict type checks |
 
 The only supplied agent type is the **Research Brief Agent**. It can operate on
 approved supplied facts or receive an immutable definition upgrade granting the
@@ -87,13 +88,17 @@ scripted; no live LLM provider is wired in.
 ## Architecture
 
 The implemented architecture is a **modular Python application**, not a microservice
-deployment. The diagram shows the Stage 1–3 core; the Stage 4 knowledge boundary
-is described immediately below it. These are logical responsibilities, not services.
+deployment. These are logical responsibilities, not separately deployed services.
 
 ~~~mermaid
 flowchart TD
     caller["Application caller or tests"] --> domainService["DomainService"]
     caller --> agentRuntime["AgentRuntimeService"]
+    caller --> orchestrator["OrchestrationService"]
+    orchestrator -->|"OrchestrationStrategyPort"| planner["Deterministic or fake strategy"]
+    orchestrator -->|"Validate + materialize"| domainService
+    orchestrator -->|"Select eligible definition"| selector["AgentSelector"]
+    orchestrator -->|"Delegate ready task"| agentRuntime
     agentRuntime -->|"Domain commands"| domainService
     domainService -->|"Enforces invariants"| domain["Typed domain entities"]
     agentRuntime -->|"ModelPort"| model["Scripted FakeModel"]
@@ -107,6 +112,8 @@ flowchart TD
     toolRuntime -->|"Claims and receipts"| history
     knowledge -->|"EvidencePack"| history
     memory -->|"MemoryContextPack"| history
+    orchestrator -->|"Plans, delegations, lineage"| orchestrationHistory["In-memory orchestration records"]
+    orchestrationHistory ---|"Shared rollback boundary"| state
     history ---|"Shared rollback boundary"| state
 ~~~
 
@@ -170,9 +177,42 @@ invocation. Conflicts are retained and labeled; Knowledge keeps precedence becau
 Memory is never accepted by the completion evidence evaluator. See
 [ADR-008](docs/architecture/ADR/ADR-008-governed-memory.md).
 
+### Orchestration and delegation boundary
+
+`OrchestrationService` turns an active Goal into a bounded, validated plan without
+giving the planner authority over canonical state. A replaceable strategy returns an
+untrusted proposal; deterministic validation enforces workspace, size, dependency,
+depth, eligibility, and policy limits before creating an immutable `PlanVersion`.
+Materialization creates canonical Tasks exactly once. Readiness is derived from
+completed dependencies, and deterministic selection binds each delegation to an exact
+published `AgentDefinitionVersion` before the existing `AgentRuntimeService` executes it.
+
+~~~mermaid
+flowchart LR
+    goal["Active Goal"] --> strategy["Replaceable strategy"]
+    strategy --> proposal["Untrusted PlanProposal"]
+    proposal --> validation{"Domain + policy validation"}
+    validation -->|"reject"| waiting["Failed or waiting with reason"]
+    validation -->|"accept"| version["Immutable PlanVersion"]
+    version --> tasks["One-time canonical Task materialization"]
+    tasks --> ready{"Dependencies complete?"}
+    ready -->|"yes"| selection["Deterministic eligible-agent selection"]
+    selection --> delegation["Delegation with exact version lineage"]
+    delegation --> runtime["Existing AgentRuntimeService"]
+    runtime --> result["TaskResultReference"]
+    result --> aggregate["Structural completion validation"]
+~~~
+
+Planning is replaceable; the planner cannot create permissions, bypass Task state,
+or certify Goal success. Replanning preserves immutable history and cannot remove
+already materialized work in Stage 6. The implementation is synchronous and in-memory;
+it is not a durable workflow engine, queue, multi-agent chat system, or live-model
+planner. See [ADR-009](docs/architecture/ADR/ADR-009-replaceable-orchestration-and-delegation.md).
+
 The [System Architecture](docs/architecture/SYSTEM_ARCHITECTURE.md) describes the
-broader target design. Its UI, planning, memory, and production infrastructure layers
-must not be mistaken for implemented services.
+broader target design. Its multi-agent communication, organization UI, approval,
+external integration, and production infrastructure layers must not be mistaken for
+implemented services.
 
 ### Domain vocabulary
 
@@ -190,6 +230,10 @@ must not be mistaken for implemented services.
 | MemoryCandidate | Host-derived proposal that policy rejects or sends to human review |
 | MemoryEntry | Reviewed retained experience with immutable content/provenance |
 | MemoryContextPack | Exact bounded memory snapshot for one run; never grounding evidence |
+| PlanVersion | Immutable accepted plan snapshot with ordered tasks, dependencies, policy, and lineage |
+| OrchestrationRun | Bounded coordinator state for planning, materialization, delegation, and completion |
+| Delegation | Assignment of one canonical Task to one exact AgentDefinitionVersion |
+| TaskResultReference | Exact successful TaskAttempt/AgentRun result lineage used by downstream work |
 
 See the [Domain Model](docs/architecture/DOMAIN_MODEL.md) and
 [Glossary](docs/project/GLOSSARY.md) for complete definitions.
@@ -323,11 +367,11 @@ lint, type checking, and tests on pushes and pull requests. The test phase is of
 and secret-free; dependency installation still uses package downloads. The CI badge
 above tracks `main`, not unmerged pull-request branches.
 
-The [Stage 4 report](docs/STAGE_4_REPORT.md) records **206 passing tests**:
-155 existing tests and 51 Stage 4 cases. Coverage includes malformed inputs/outputs,
-permission denials, foreign-workspace references, forged provenance, injection
-attempts, budgets, cancellation races, stale versions, and claim/result rollback.
-Passing scripted tests establishes software behavior—not live-model answer quality.
+The [Stage 6 report](docs/STAGE_6_REPORT.md) records **286 passing tests**, including
+40 orchestration cases covering DAG validation, scheduling, exact-version eligibility,
+dependency blocking, retries, redelegation, replanning, cancellation, stale versions,
+injection, atomic rollback, completion, and lineage. Passing scripted tests establishes
+software behavior—not live-model planning or answer quality.
 
 Run the Company Brain scenarios alone with `python -m pytest tests/test_knowledge.py -q`.
 The fictional Aurora Desk corpus demonstrates missing-context recovery, version updates,
@@ -340,14 +384,15 @@ bounded retrieval, and combined knowledge/tool evidence without network calls.
 .
 ├── src/agent_company_os/
 │   ├── domain/              # Entities, value objects, state and evidence contracts
-│   ├── application/         # Domain use cases, agent and tool runtime services
-│   ├── ports/               # Typed model, tool, clock, ID and storage boundaries
-│   ├── adapters/            # In-memory stores, scripted doubles, fixture tools
+│   ├── application/         # Domain, agent, tool, knowledge, memory and orchestration services
+│   ├── ports/               # Typed runtime, strategy, policy, ID and storage boundaries
+│   ├── adapters/            # In-memory stores, deterministic strategies and scripted doubles
 │   └── serialization.py     # Explicit domain boundary serialization
 ├── tests/
 │   ├── fixtures/agent_eval/ # Deterministic and adversarial evaluation fixtures
 │   ├── test_runtime.py      # Single-agent scenarios and failure paths
-│   └── test_tools.py        # Tool contracts, safety, provenance and race tests
+│   ├── test_tools.py        # Tool contracts, safety, provenance and race tests
+│   └── test_orchestration.py # Stage 6 planning and delegation scenarios
 ├── docs/
 │   ├── product/             # Requirements, personas, scope and success criteria
 │   ├── architecture/        # Domain, runtime, security and architecture decisions
@@ -368,12 +413,14 @@ bounded retrieval, and combined knowledge/tool evidence without network calls.
 | 2 | Single-agent runtime | Verified with a scripted model |
 | 3 | Controlled read-only Tool Runtime | Implemented and verified offline |
 | 4 | Company Brain / Knowledge Retrieval | Implemented and verified offline |
-| 5 | Governed state and memory | Planned |
-| 6–9 | Orchestration, communication, organization, and human approval | Planned |
+| 5 | Governed Memory | Implemented and verified offline |
+| 6 | Replaceable orchestration and delegation | Implemented and verified offline |
+| 7–9 | Communication, organization, and human approval | Planned |
 | 10–13 | Observability UI, evaluation hardening, integrations, and production | Planned |
 
 Stages are evidence gates, not release dates. Planning may eventually be deterministic,
-agentic, or hybrid; no orchestrator or agent framework has been selected by default.
+agentic, or hybrid; Stage 6 selects a replaceable seam and deterministic baseline, not
+a general planner model or agent framework.
 See the [Development Roadmap](docs/engineering/DEVELOPMENT_ROADMAP.md).
 
 ## Security and known limitations
@@ -406,15 +453,18 @@ remain outside model context when future integrations are introduced. Read the
 | Domain and system design | [Domain Model](docs/architecture/DOMAIN_MODEL.md), [System Architecture](docs/architecture/SYSTEM_ARCHITECTURE.md), [Agent Runtime](docs/architecture/AGENT_RUNTIME_ARCHITECTURE.md), [Data Architecture](docs/architecture/DATA_ARCHITECTURE.md) |
 | Engineering standards | [Principles](docs/engineering/ENGINEERING_PRINCIPLES.md), [testing](docs/engineering/TESTING_STRATEGY.md), [evaluation](docs/engineering/EVALUATION_STRATEGY.md), [observability](docs/engineering/OBSERVABILITY_STRATEGY.md) |
 | Shared terminology | [Glossary](docs/project/GLOSSARY.md), [assumptions](docs/project/ASSUMPTIONS.md), [open questions](docs/project/OPEN_QUESTIONS.md) |
-| Implementation evidence | [Stage 1](docs/STAGE_1_REPORT.md), [Stage 2](docs/STAGE_2_REPORT.md), [Stage 3](docs/STAGE_3_REPORT.md), [Stage 4](docs/STAGE_4_REPORT.md) |
+| Implementation evidence | [Stage 1](docs/STAGE_1_REPORT.md), [Stage 2](docs/STAGE_2_REPORT.md), [Stage 3](docs/STAGE_3_REPORT.md), [Stage 4](docs/STAGE_4_REPORT.md), [Stage 5](docs/STAGE_5_REPORT.md), [Stage 6](docs/STAGE_6_REPORT.md) |
 | Foundation history | [Stage 0](docs/STAGE_0_REPORT.md), [Stage 0.1](docs/STAGE_0_1_REFINEMENT_REPORT.md) |
 
 Key decisions: [architecture principles](docs/architecture/ADR/ADR-001-architecture-principles.md),
 [execution semantics](docs/architecture/ADR/ADR-002-execution-domain-semantics.md),
 [agent identity](docs/architecture/ADR/ADR-003-agent-definition-and-runtime-identity.md),
 [Python selection](docs/architecture/ADR/ADR-004-implementation-language.md),
-[single-agent protocol](docs/architecture/ADR/ADR-005-single-agent-runtime.md), and
-[Tool Runtime](docs/architecture/ADR/ADR-006-tool-runtime.md).
+[single-agent protocol](docs/architecture/ADR/ADR-005-single-agent-runtime.md),
+[Tool Runtime](docs/architecture/ADR/ADR-006-tool-runtime.md),
+[Company Brain](docs/architecture/ADR/ADR-007-company-brain-and-knowledge-retrieval.md),
+[governed Memory](docs/architecture/ADR/ADR-008-governed-memory.md), and
+[replaceable orchestration](docs/architecture/ADR/ADR-009-replaceable-orchestration-and-delegation.md).
 
 ## Contributing
 

@@ -1,5 +1,20 @@
 # Data Architecture
 
+## Implemented Stage 6 orchestration records
+
+The in-memory Stage 6 adapter stores canonical OrchestrationRuns, immutable PlanVersions,
+one PlanMaterialization per plan version, Delegations, DelegationAttempts, exact
+TaskResultReferences, and audit Events. Plan history is append-only; canonical Goal,
+Task, Execution, TaskAttempt, and AgentRun state remains directly stored rather than
+reconstructed from events. Materialization and delegation writes share the existing
+atomic snapshot/rollback boundary so partial cross-record writes are not visible.
+
+Every record carries workspace and exact version lineage where relevant. Downstream
+result references identify the source Task, TaskAttempt, AgentRun, result version, and
+source references. They do not copy permissions or create a shared-memory channel.
+This adapter proves semantics only; durable transactions, worker claims, retention,
+process-loss recovery, and database schema selection remain open.
+
 ## Implemented Stage 5 memory records
 
 Governed Memory adds three logical records: reviewable `MemoryCandidate`, retained

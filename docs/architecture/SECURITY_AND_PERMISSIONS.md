@@ -1,5 +1,21 @@
 # Security and Permissions
 
+## Stage 6 orchestration controls
+
+Plan proposals and delegated outputs are untrusted data. Deterministic validators—not
+planner text—enforce workspace isolation, DAG validity, bounded size/depth, active
+definition eligibility, capabilities, exact tool/Knowledge/Memory grants, autonomy
+ceilings, parallel width, iteration, retry, replan, agent-run, and failure budgets.
+Agent selection only chooses an already published exact AgentDefinitionVersion; a
+Delegation cannot broaden that version's authority.
+
+Cross-workspace plans, stale versions, disabled definitions, and unmatched grants are
+rejected. Dependent-task context contains only exact successful upstream lineage and is
+labeled as supplied data. Prompt-like content in a plan or result cannot change policy,
+permissions, or execution control. Cancellation is explicit and prevents new work.
+Stage 6 does not add approvals, write-capable tools, external integrations, agent-to-agent
+messaging, dynamic credential access, or a security sandbox.
+
 ## Stage 5 memory controls
 
 - Memory has no model-controlled write Action. Trusted host code derives candidates

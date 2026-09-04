@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "cases": [
+    "simple_linear_plan",
+    "parallel_ready_tasks",
+    "dependency_block",
+    "cycle_attack",
+    "too_many_tasks",
+    "unknown_agent_requirement",
+    "unauthorized_agent",
+    "task_failure_retry",
+    "task_failure_redelegate",
+    "replan_success",
+    "replan_exhaustion",
+    "duplicate_plan_replay",
+    "stale_plan",
+    "planner_injection",
+    "goal_completion"
+  ]
+}

@@ -92,12 +92,29 @@ Stages are capability gates, not calendar estimates. A later stage begins only w
 
 ## Stage 6 — Orchestration and delegation
 
-- **Objective:** convert Goals into bounded Tasks and coordinate the MVP agent team.
-- **Build:** replaceable PlanningPort/Structured Plan contract, deterministic and agentic/hybrid strategy adapters as justified, domain validation of proposed plans, dependency scheduling, eligibility selection, budgets, progress aggregation, handoff and escalation records.
-- **Do not build:** unlimited recursive delegation, mandatory supervisor for every workflow, departments UI.
-- **Tests required:** cyclic dependency/handoff, partial failure, budget allocation, cancellation propagation, poor-plan fixtures, deterministic direct-workflow path.
-- **Completion criteria:** at least two planning strategies can drive the same Goal/Task/TaskAttempt/Execution machinery; the chosen manager coordinates Research, Analyst, and Writer/Reporter on reference cases within bounds.
-- **Questions answered:** orchestrator identity, planning representation, routing criteria, task ownership.
+- **Implemented status (2026-09-04):** deterministic Stage 6 gate passed. See
+  [Stage 6 report](../STAGE_6_REPORT.md) and
+  [ADR-009](../architecture/ADR/ADR-009-replaceable-orchestration-and-delegation.md).
+- **Objective:** convert active Goals into bounded validated Task graphs and coordinate
+  eligible exact AgentDefinitionVersions through the existing Agent Runtime.
+- **Built:** replaceable asynchronous strategy port, deterministic research/analysis/report
+  strategy and scripted fake, untrusted proposal validation, immutable PlanVersions,
+  one-time canonical materialization, dependency readiness, deterministic least-loaded
+  selection, exact delegation/attempt/result lineage, bounded retries/redelegation/replans,
+  structural aggregation, cancellation, audit Events, and atomic in-memory storage.
+- **Not built:** live/model-driven planning, dynamic task decomposition, partial Goal
+  success, compensation, direct agent messaging, durable queues/workers, production
+  persistence, departments/UI, or unlimited recursive delegation.
+- **Tests passed:** A–AC linear/parallel/DAG/bounds/materialization/replan/eligibility/
+  scope/failure/retry/redelegation/staleness/injection/cancellation/rollback/completion/
+  lineage cases through the existing domain and AgentRuntime machinery.
+- **Completion evidence:** two adapters exercise the same strategy contract and validator;
+  the deterministic reference strategy coordinates Research, Analysis, and Writing
+  capabilities within explicit limits. This proves replaceability and orchestration
+  semantics, not live-agent planning quality.
+- **Questions answered:** orchestration is an application service, plans are immutable
+  validated DAG snapshots, routing requires exact published eligibility, and a Task is
+  assigned by a Delegation but remains owned by the canonical domain.
 
 ## Stage 7 — Multi-agent communication
 
@@ -164,8 +181,8 @@ Stages are capability gates, not calendar estimates. A later stage begins only w
 
 ## Immediate next milestone
 
-Stage 5 provides reviewed, scoped retained context without weakening authoritative
-evidence. The next proposed milestone is Stage 6: replaceable orchestration and
-delegation through the existing Goal/Task/Execution machinery. Stage 6 is not started
-automatically. Live-provider quality, durable storage, production privacy, and
-external write capability are not implied by this gate.
+Stage 6 provides bounded replaceable planning, deterministic delegation, and exact
+cross-task result lineage without weakening domain or permission authority. The next
+proposed milestone is Stage 7: typed multi-agent communication and handoffs. Stage 7 is
+not started automatically. Live-provider quality, durable workflow recovery, production
+privacy, and external write capability are not implied by the Stage 6 gate.
