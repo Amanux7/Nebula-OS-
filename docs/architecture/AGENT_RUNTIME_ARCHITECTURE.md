@@ -1,5 +1,35 @@
 # Agent Runtime Architecture
 
+## Stage 5 memory integration
+
+Memory-enabled AgentDefinitionVersions carry exact `MemoryAccessPolicy` grants. The
+trusted host—not the model—uses `MemoryService` to retrieve a bounded pack for an idle
+run. `AgentWorkingState.active_memory_pack_id` stores the current reference and
+`AgentModelRequest.memory_context` carries the immutable pack separately from supplied
+data, tool Observations, and Knowledge evidence.
+
+```mermaid
+sequenceDiagram
+    participant Host
+    participant Memory as MemoryService
+    participant Runtime as AgentRuntimeService
+    participant Model as ModelPort
+    Host->>Memory: retrieve(scoped query, expected run version)
+    Memory->>Memory: filter active + unexpired + exact grants
+    Memory-->>Host: immutable MemoryContextPack
+    Host->>Runtime: drive(expected version)
+    Runtime->>Memory: validate active pack
+    Runtime->>Model: request(memory_context separate)
+    Model-->>Runtime: untrusted structured decision
+    Runtime->>Memory: revalidate active pack
+    Runtime->>Runtime: validate policy, grounding, and state
+```
+
+The pinned identities are `single-agent-memory-v1` and `governed-memory-v1`.
+Memory is never supplied to the deterministic completion evaluator, so it cannot
+masquerade as Knowledge. A concurrent revoke, supersede, expiry, or access change
+invalidates the result after the model call. No locks are held over that call.
+
 ## Purpose and stage boundary
 
 The future Agent Runtime executes one bounded AgentRun for a TaskAttempt. It turns an immutable AgentDefinitionVersion and authorized context into validated Actions, Observations, explicit StateTransitions, and a terminal or waiting outcome inside an enclosing Execution.

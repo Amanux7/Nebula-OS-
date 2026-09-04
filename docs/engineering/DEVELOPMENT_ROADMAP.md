@@ -64,14 +64,31 @@ Stages are capability gates, not calendar estimates. A later stage begins only w
 - **Completion criteria:** the requested deterministic baseline and disablement/access gate passes. ADR-007 explicitly defers the former broad semantic-quality and deletion-propagation targets pending real requirements.
 - **Questions answered:** lexical baseline, immutable provenance/pack model, latest active retrieval versus exact historical versions, direct source allowlists, internal capability seam. Production freshness and retention remain open.
 
-## Stage 5 — Agent state and memory
+## Stage 5 — Governed Memory
 
-- **Objective:** separate working state from deliberately retained experience.
-- **Build:** Memory Entry schema, scope, promotion/review policy, confidence/provenance, expiry/supersession, retrieval limits.
-- **Do not build:** automatic retention of every conversation, global personality memory, vector search as memory.
-- **Tests required:** scope isolation, stale/superseded memory, retention/deletion, poisoning/prompt injection, conflict with authoritative knowledge.
-- **Completion criteria:** memory improves selected eval cases without violating isolation or freshness guardrails.
-- **Questions answered:** ownership, promotion, retention, conflict resolution, types of memory worth retaining.
+- **Implemented status (2026-09-04):** deterministic governed-memory gate passed.
+  See [Stage 5 report](../STAGE_5_REPORT.md) and
+  [ADR-008](../architecture/ADR/ADR-008-governed-memory.md).
+- **Objective:** separate Working State and authoritative Knowledge from deliberately
+  retained experience.
+- **Built:** host-derived MemoryCandidates, review-only promotion, Episodic/Semantic
+  MemoryEntries, exact scope/sensitivity grants, canonical provenance, rejection of
+  unsupported inference/Knowledge duplication/detectable secrets, lazy expiry,
+  revocation, atomic supersession, duplicate suppression, deterministic lexical
+  retrieval, immutable MemoryContextPacks, runtime revalidation, conflict flags, and
+  audit Events.
+- **Not built:** model memory writes, automatic learning/consolidation, conversation
+  capture, confidence scoring, embeddings/vector search, durable storage, production
+  deletion, approval UI, multi-agent memory, external providers, or orchestration.
+- **Tests passed:** policy fixtures and lifecycle, scope, sensitivity, history,
+  poisoning, conflict, provenance, concurrency, rollback, runtime-race, serialization,
+  and non-grounding scenarios. Offline fixtures are not live-model quality evidence.
+- **Completion criteria:** the deterministic governance gate passes. The earlier broad
+  “improves selected eval cases” target is narrowed to proving separately labeled
+  context and safety; quality uplift requires calibrated live-model/human evaluation.
+- **Questions answered:** initial ownership (exact grants), review-only promotion,
+  non-destructive lifecycle, Knowledge precedence, and bounded retrieval. Production
+  privacy, durability, and semantic retrieval remain open.
 
 ## Stage 6 — Orchestration and delegation
 
@@ -147,8 +164,8 @@ Stages are capability gates, not calendar estimates. A later stage begins only w
 
 ## Immediate next milestone
 
-Stage 4 provides a bounded authorized retrieval baseline and immutable source evidence.
-The next proposed milestone is Stage 5: governed state and Memory, beginning with
-ownership, promotion/review, expiry, retention, and conflict-policy decisions.
-Stage 5 is not started automatically. Live-provider answer quality, durable storage,
-production readiness, and external write capability are not implied by this gate.
+Stage 5 provides reviewed, scoped retained context without weakening authoritative
+evidence. The next proposed milestone is Stage 6: replaceable orchestration and
+delegation through the existing Goal/Task/Execution machinery. Stage 6 is not started
+automatically. Live-provider quality, durable storage, production privacy, and
+external write capability are not implied by this gate.

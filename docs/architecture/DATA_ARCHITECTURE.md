@@ -1,5 +1,21 @@
 # Data Architecture
 
+## Implemented Stage 5 memory records
+
+Governed Memory adds three logical records: reviewable `MemoryCandidate`, retained
+`MemoryEntry`, and immutable run-bound `MemoryContextPack`. Candidate and entry
+content is capped at 1,000 characters and retains exact source-run references,
+authority, sensitivity, type, and explicit scope. Entry content/provenance is
+immutable; only active/revoked/superseded lifecycle metadata changes. Expiry is a
+time-based retrieval predicate rather than destructive mutation.
+
+The in-memory store shares the runtime rollback boundary for promotion,
+supersession, pack activation, and Events. It retains at most 200 candidates and 200
+entries per workspace, 20 entries per subject, and 5 packs per run. This proves
+logical contracts only: there is no durable retention, deletion propagation, vector
+index, backup, or production privacy implementation. Historical packs retain exact
+snapshots even when current use is invalidated.
+
 ## Implemented Stage 4 knowledge records
 
 Company Brain is the logical source-governance/retrieval capability, not a vector

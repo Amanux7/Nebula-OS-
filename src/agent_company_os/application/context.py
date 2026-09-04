@@ -4,6 +4,7 @@ from agent_company_os.domain.agent import ActionType, AgentRun
 from agent_company_os.domain.decisions import ModelDecision, ModelFailure
 from agent_company_os.domain.goal import Goal
 from agent_company_os.domain.knowledge import EvidencePack
+from agent_company_os.domain.memory import MemoryContextPack
 from agent_company_os.domain.task import Task
 from agent_company_os.domain.tools import ToolVersion
 from agent_company_os.ports.model import AgentModelRequest
@@ -17,6 +18,7 @@ class ContextAssembler:
         task: Task,
         tools: tuple[ToolVersion, ...] = (),
         knowledge: EvidencePack | None = None,
+        memory: MemoryContextPack | None = None,
     ) -> AgentModelRequest:
         values = [
             goal.objective,
@@ -50,7 +52,9 @@ class ContextAssembler:
                 )
             )
         if (
-            sum(len(value) for value in values) + (knowledge.context_chars if knowledge else 0)
+            sum(len(value) for value in values)
+            + (knowledge.context_chars if knowledge else 0)
+            + (memory.context_chars if memory else 0)
             > run.limits.max_context_chars
         ):
             raise ModelFailure("context_overflow")
@@ -67,6 +71,7 @@ class ContextAssembler:
             run.limits.max_iterations,
             available_tools=tools,
             knowledge_evidence=knowledge,
+            memory_context=memory,
         )
 
 
@@ -75,6 +80,8 @@ class ActionPolicy:
 
     @staticmethod
     def version_for(run: AgentRun) -> str:
+        if run.definition_version.memory_access.scopes:
+            return "governed-memory-v1"
         if run.definition_version.knowledge_scope.source_ids:
             return "bounded-knowledge-tools-v1"
         return (

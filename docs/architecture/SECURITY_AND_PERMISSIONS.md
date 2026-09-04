@@ -1,5 +1,25 @@
 # Security and Permissions
 
+## Stage 5 memory controls
+
+- Memory has no model-controlled write Action. Trusted host code derives candidates
+  from canonical, successful source-run records.
+- Every eligible candidate requires named human review; semantic memory is never
+  automatically promoted. Unsupported model inference, Knowledge duplication, and
+  detectable credential patterns are rejected.
+- Exact scope and sensitivity grants are pinned to AgentDefinitionVersion. Query
+  filters only narrow grants, and there is no implicit workspace-global access.
+- Restricted and sensitive entries require corresponding grants. Cross-workspace
+  create, review, revoke, supersede, retrieve, and historical-read paths are denied.
+- Revocation, supersession, expiry, and grant changes are checked again after model
+  invocation so stale context cannot commit a decision.
+- Memory remains untrusted contextual data and cannot ground a completion or override
+  authoritative Knowledge. Conflicts are retained and visibly flagged.
+
+The regex secret check is only defense in depth. Authentication, DLP, encryption,
+production deletion/redaction, reviewer authorization, and durable policy
+linearization remain required before real sensitive data is permitted.
+
 ## Security posture
 
 ### Implemented Stage 4 controls

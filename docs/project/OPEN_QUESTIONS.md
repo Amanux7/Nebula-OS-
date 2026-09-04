@@ -2,6 +2,26 @@
 
 These decisions are intentionally unresolved. “Target stage” indicates when evidence is expected, not a deadline to decide prematurely.
 
+## Stage 5 decision updates
+
+- OQ-012: ADR-008 selects explicit exact scope/sensitivity grants on immutable
+  AgentDefinitionVersions. No global default or cross-scope sharing is implemented.
+- OQ-013: host-derived candidates, review-only promotion, exact provenance,
+  non-destructive lifecycle, deterministic retrieval, and separately labeled
+  MemoryContextPacks are implemented. Memory never grounds completion or overrides
+  authoritative Knowledge; conflicts are preserved and flagged.
+- OQ-015: the Stage 5 adapter requires a named human reviewer for promotion,
+  rejection, and revocation. Authenticated roles, UI, deletion rights, separation of
+  duties, and production privacy operations remain unresolved.
+- OQ-029/030: no model memory-write Action is added. Minimal candidate/entry/retrieval
+  Events are audit records, not event sourcing or a durable delivery contract.
+
+New questions: which real workflows justify auto-promotion; what deletion/redaction
+and retention duties apply by scope/sensitivity; whether confidence is useful beyond
+authority/provenance; what corpus evidence warrants semantic retrieval; and how
+reviewer authorization and concurrent policy changes are linearized in production.
+No database, vector index, queue, or memory framework is selected.
+
 ## Stage 4 decision updates
 
 - OQ-014: ADR-007 selects bounded lexical-overlap retrieval over text/Markdown/typed

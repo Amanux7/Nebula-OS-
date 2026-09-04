@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {"name": "concrete_user_statement", "kind": "user_statement", "authority": "stated", "expected": "under_review"},
+    {"name": "tool_observation", "kind": "tool_receipt", "authority": "observed", "expected": "under_review"},
+    {"name": "task_result", "kind": "task_result", "authority": "derived", "expected": "under_review"},
+    {"name": "semantic_user_fact", "kind": "user_statement", "authority": "stated", "expected": "under_review"},
+    {"name": "sensitive_candidate", "kind": "user_statement", "authority": "stated", "expected": "under_review"},
+    {"name": "restricted_candidate", "kind": "user_statement", "authority": "stated", "expected": "under_review"},
+    {"name": "model_inference", "kind": "agent_output", "authority": "inferred", "expected": "rejected"},
+    {"name": "inferred_statement", "kind": "user_statement", "authority": "inferred", "expected": "rejected"},
+    {"name": "knowledge_duplication", "kind": "knowledge_evidence", "authority": "observed", "expected": "rejected"},
+    {"name": "secret_pattern", "kind": "user_statement", "authority": "stated", "expected": "rejected"},
+    {"name": "normal_episodic", "kind": "user_statement", "authority": "observed", "expected": "under_review"},
+    {"name": "normal_semantic", "kind": "user_statement", "authority": "derived", "expected": "under_review"}
+  ]
+}

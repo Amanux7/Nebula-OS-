@@ -10,6 +10,7 @@ from agent_company_os.domain.agent import (
     SuppliedContext,
 )
 from agent_company_os.domain.knowledge import EvidencePack
+from agent_company_os.domain.memory import MemoryContextPack
 from agent_company_os.domain.tools import ToolVersion
 
 
@@ -28,6 +29,7 @@ class AgentModelRequest:
     schema_version: int = 1
     available_tools: tuple[ToolVersion, ...] = ()
     knowledge_evidence: EvidencePack | None = None
+    memory_context: MemoryContextPack | None = None
 
 
 class ModelPort(Protocol):

@@ -1,5 +1,54 @@
 # Domain Model
 
+## Implemented Stage 5 governed-memory model
+
+`MemoryCandidate` is a workspace/run-bound proposal derived by trusted host code from
+canonical source references. Policy either rejects it or moves it to `under_review`;
+there is no model memory-write Action. Human approval creates an immutable-content
+`MemoryEntry`. An active entry may later become `revoked` or `superseded`; expiry is
+evaluated without destroying history. `MemoryContextPack` captures exact authorized
+entries for one AgentRun and is not an EvidencePack or grounding source.
+
+```mermaid
+stateDiagram-v2
+    [*] --> proposed
+    proposed --> under_review: policy permits review
+    proposed --> rejected: policy rejects
+    under_review --> promoted: human approves
+    under_review --> rejected: human rejects
+    promoted --> [*]
+    rejected --> [*]
+```
+
+```mermaid
+stateDiagram-v2
+    [*] --> active: reviewed promotion
+    active --> revoked: explicit review action
+    active --> superseded: approved replacement
+    revoked --> [*]
+    superseded --> [*]
+```
+
+Memory invariants:
+
+- Candidates, entries, scopes, source runs, queries, packs, and events share one
+  workspace; cross-workspace references fail.
+- Candidate provenance names the exact successful AgentRun and bounded source
+  references. Unsupported inference, Knowledge duplication, and detectable secrets
+  are rejected by the Stage 5 policy.
+- Every promotion is human-reviewed. Entry content, provenance, type, scope,
+  sensitivity, review identity, and review time never mutate.
+- Exact duplicate candidates are idempotent. Supersession creates a new entry and
+  atomically terminates the previous one; it never overwrites old content.
+- Retrieval requires an exact AgentDefinitionVersion scope/sensitivity grant and
+  excludes expired, revoked, and superseded entries.
+- Historical packs retain exact entry snapshots. Revocation, supersession, expiry,
+  or grant invalidation prevents active reuse but does not erase the pack.
+- Memory is context only. It cannot satisfy a Knowledge claim or completion evidence
+  requirement, and conflicts are preserved and labeled.
+
+See [ADR-008](ADR/ADR-008-governed-memory.md) for bounds and deferred policy work.
+
 ## Stage 4 implemented knowledge extension
 
 The existing Goal/Task/TaskAttempt/Execution/AgentRun semantics are unchanged.

@@ -11,9 +11,10 @@ scoped capabilities, and evidence behind every accepted result.
 
 > **AI for judgment. Software for guarantees.**
 
-**Current milestone: Stage 4 — Company Brain / Knowledge Retrieval.** The repository implements a
+**Current milestone: Stage 5 — Governed Memory.** The repository implements a
 deterministic domain foundation, a single-agent loop driven by a scripted model,
-two read-only fixture tools, and bounded, source-aware knowledge retrieval.
+two read-only fixture tools, bounded source-aware Knowledge retrieval, and
+human-reviewed scoped Memory.
 It is an early-stage engineering foundation,
 not a deployed autonomous company or a production-ready AI service.
 
@@ -42,7 +43,7 @@ not a claim about the current implementation.
 | Repository | [Amanux7/Nebula-OS-](https://github.com/Amanux7/Nebula-OS-) |
 | Repository owner | [Amanux7](https://github.com/Amanux7) |
 | License | [MIT](LICENSE) |
-| Current focus | Safe execution, tool permissions, provenance, and deterministic verification |
+| Current focus | Safe execution, authoritative evidence, reviewed memory, provenance, and deterministic verification |
 | Intended users | Founders, startup teams, operations leaders, automation builders, agencies, and SMBs |
 | Reference workflow | Evidence-backed research and structured business briefs |
 
@@ -73,9 +74,10 @@ cannot grant permissions, bypass domain invariants, or certify its own success.
 | Controlled tools | Exact-version registry, explicit grants, read-only risk enforcement, strict inputs and outputs |
 | Execution evidence | Immutable ToolReceipts, typed Observations, audit Events, and explicit receipt export |
 | Company Brain | Versioned text/Markdown/structured facts, source grants, lexical retrieval, and immutable EvidencePacks |
+| Governed Memory | Host-derived candidates, mandatory human review, scoped Episodic/Semantic entries, lifecycle controls, and immutable MemoryContextPacks |
 | Grounded completion | Exact findings checked against supplied facts, successful tool receipts, or active same-run knowledge evidence |
 | Failure handling | Timeouts, budgets, duplicate-invocation protection, stale-result rejection, and atomic rollback |
-| Verification | 206 passing tests at the Stage 4 gate, plus formatting, lint, and strict type checks |
+| Verification | 246 passing tests at the Stage 5 gate, plus formatting, lint, and strict type checks |
 
 The only supplied agent type is the **Research Brief Agent**. It can operate on
 approved supplied facts or receive an immutable definition upgrade granting the
@@ -96,11 +98,15 @@ flowchart TD
     domainService -->|"Enforces invariants"| domain["Typed domain entities"]
     agentRuntime -->|"ModelPort"| model["Scripted FakeModel"]
     agentRuntime -->|"ToolRuntimePort"| toolRuntime["ToolRuntimeService"]
+    agentRuntime -->|"KnowledgeRuntimePort"| knowledge["KnowledgeService"]
+    agentRuntime -->|"MemoryRuntimePort"| memory["MemoryService"]
     toolRuntime -->|"Resolve exact grants"| registry["ToolRegistry"]
     toolRuntime -->|"ToolExecutor"| fixtures["Read-only fixture tools"]
     domainService -->|"DomainStore"| state["In-memory domain state"]
     agentRuntime -->|"RuntimeStore"| history["In-memory runtime records"]
     toolRuntime -->|"Claims and receipts"| history
+    knowledge -->|"EvidencePack"| history
+    memory -->|"MemoryContextPack"| history
     history ---|"Shared rollback boundary"| state
 ~~~
 
@@ -135,6 +141,35 @@ serialized pack, 2 candidates/source, and 5 packs/run. The existing total contex
 still applies. See [ADR-007](docs/architecture/ADR/ADR-007-company-brain-and-knowledge-retrieval.md)
 for all hard limits, historical-version policy, revocation, and grounding limitations.
 
+### Governed Memory boundary
+
+Memory is retained experience, not authoritative Knowledge. Trusted host code derives
+a bounded candidate from canonical successful-run references. Deterministic policy
+rejects unsupported model inference, Knowledge duplication, and detectable secrets;
+every eligible candidate then requires explicit human approval. Promotion creates an
+immutable-content entry that can later be revoked, superseded, or excluded by expiry.
+
+~~~mermaid
+flowchart LR
+    source["Successful AgentRun sources"] --> candidate["MemoryCandidate"]
+    candidate --> policy{"Policy"}
+    policy -->|"reject"| rejected["Rejected + audited"]
+    policy -->|"review"| review{"Human review"}
+    review -->|"reject"| rejected
+    review -->|"approve"| entry["Active MemoryEntry"]
+    entry --> filter["Exact scope + sensitivity + lifecycle filters"]
+    filter --> pack["Immutable MemoryContextPack"]
+    pack --> model["Separate model context"]
+    knowledge2["Authoritative Knowledge"] --> evidence["Grounding evaluator"]
+    model -.->|"Memory cannot ground"| evidence
+~~~
+
+Retrieval uses exact subject matching and deterministic lexical ranking under explicit
+AgentDefinitionVersion grants. The runtime revalidates packs before and after model
+invocation. Conflicts are retained and labeled; Knowledge keeps precedence because
+Memory is never accepted by the completion evidence evaluator. See
+[ADR-008](docs/architecture/ADR/ADR-008-governed-memory.md).
+
 The [System Architecture](docs/architecture/SYSTEM_ARCHITECTURE.md) describes the
 broader target design. Its UI, planning, memory, and production infrastructure layers
 must not be mistaken for implemented services.
@@ -152,6 +187,9 @@ must not be mistaken for implemented services.
 | Action | A requested operation—not proof that it happened |
 | Observation | Information returned to the runtime, with provenance and trust |
 | ToolReceipt | Immutable evidence of what a tool invocation returned or how it failed |
+| MemoryCandidate | Host-derived proposal that policy rejects or sends to human review |
+| MemoryEntry | Reviewed retained experience with immutable content/provenance |
+| MemoryContextPack | Exact bounded memory snapshot for one run; never grounding evidence |
 
 See the [Domain Model](docs/architecture/DOMAIN_MODEL.md) and
 [Glossary](docs/project/GLOSSARY.md) for complete definitions.

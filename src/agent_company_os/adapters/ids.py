@@ -14,10 +14,20 @@ from agent_company_os.domain.ids import (
     WorkspaceId,
 )
 from agent_company_os.domain.knowledge import EvidencePackId, KnowledgeSourceId
+from agent_company_os.domain.memory import MemoryCandidateId, MemoryContextPackId, MemoryEntryId
 from agent_company_os.domain.tools import ToolInvocationId, ToolReceiptId
 
 
 class SystemIdGenerator:
+    def memory_candidate_id(self) -> MemoryCandidateId:
+        return MemoryCandidateId(str(uuid4()))
+
+    def memory_entry_id(self) -> MemoryEntryId:
+        return MemoryEntryId(str(uuid4()))
+
+    def memory_context_pack_id(self) -> MemoryContextPackId:
+        return MemoryContextPackId(str(uuid4()))
+
     def knowledge_source_id(self) -> KnowledgeSourceId:
         return KnowledgeSourceId(str(uuid4()))
 
@@ -62,6 +72,15 @@ class SystemIdGenerator:
 
 
 class DeterministicIdGenerator:
+    def memory_candidate_id(self) -> MemoryCandidateId:
+        return MemoryCandidateId(self._next("memory-candidate"))
+
+    def memory_entry_id(self) -> MemoryEntryId:
+        return MemoryEntryId(self._next("memory-entry"))
+
+    def memory_context_pack_id(self) -> MemoryContextPackId:
+        return MemoryContextPackId(self._next("memory-pack"))
+
     def knowledge_source_id(self) -> KnowledgeSourceId:
         return KnowledgeSourceId(self._next("knowledge-source"))
 

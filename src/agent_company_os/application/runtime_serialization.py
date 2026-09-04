@@ -39,5 +39,8 @@ def serialize_run(run: AgentRun) -> dict[str, object]:
         "active_evidence_pack_id": str(run.working_state.active_evidence_pack_id)
         if run.working_state.active_evidence_pack_id
         else None,
+        "active_memory_pack_id": str(run.working_state.active_memory_pack_id)
+        if run.working_state.active_memory_pack_id
+        else None,
         "result": result,
     }

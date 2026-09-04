@@ -2,6 +2,23 @@
 
 This file is the canonical terminology reference. Documents should link here rather than invent local synonyms.
 
+## Stage 5 precise memory vocabulary
+
+| Term | Definition | Important distinction |
+|---|---|---|
+| MemoryCandidate | Bounded host-derived proposal for retained Episodic or Semantic Memory, bound to exact workspace, source run/references, authority, scope, sensitivity, and policy Version. | Not durable model output; policy rejection or human review occurs before an Entry exists. |
+| MemoryEntry | Human-reviewed retained experience with immutable content/provenance and active, revoked, or superseded lifecycle. | Contextual experience, never authoritative Knowledge or completion evidence. |
+| Episodic Memory | Reviewed retained observation or statement about a specific prior experience. | More concrete than Semantic Memory but still not automatically true or authoritative. |
+| Semantic Memory | Reviewed retained generalized/structured information derived from experience. | Requires review in Stage 5; unsupported model inference is rejected. |
+| MemoryScope | Exact workspace, agent, user, customer, task, or domain key attached to a candidate/entry. | Access is explicit; there is no implicit global scope. |
+| MemoryAccessPolicy | Immutable exact scope and sensitivity grants on AgentDefinitionVersion. | A query narrows these grants and cannot expand them. |
+| MemoryProvenance | Exact source AgentRun and bounded source references plus observed/stated/inferred/derived authority. | Reviewer identity is additionally preserved on the promoted Entry. |
+| MemoryContextPack | Immutable workspace/run-bound snapshot of exact retrieved Entries, ranks, conflicts, query, strategy, and bounds. | Separate from EvidencePack; never passed to the grounding evaluator. |
+| MemoryPolicy | Versioned deterministic candidate decision returning reject or requires-review in Stage 5. | Does not assess universal truth and has no auto-promote branch in this stage. |
+
+Stage 5 uses `single-agent-memory-v1`, `governed-memory-v1`, and
+`exact-subject-lexical-v1`. See [ADR-008](../architecture/ADR/ADR-008-governed-memory.md).
+
 ## Stage 4 precise knowledge vocabulary
 
 | Term | Definition | Important distinction |
@@ -53,12 +70,12 @@ remain distinct; no experience-derived Memory or automatic promotion is implemen
 | Company Brain | Conceptual shared layer providing governed access to Knowledge, Memory, and relevant company state. | Not synonymous with RAG, embeddings, or one database. |
 | Knowledge | Persistent internally or externally authoritative information available with provenance, access, and freshness semantics, such as company policies, product data, CRM records, and approved sources. | Distinct from agent-generated Memory and is not silently overridden by it. |
 | Knowledge Source | Governed origin of Knowledge such as a document, website, note, or structured integration dataset. | Source content remains authoritative over derived indexes. |
-| Memory | Umbrella for future governed retention derived from experience; operational types, ownership, promotion, and retrieval remain deferred. | Not Working State, Conversation History, authoritative Knowledge, or vector search. |
+| Memory | Governed retention derived from experience through explicit candidate, review, scope, lifecycle, and retrieval contracts. | Not Working State, Conversation History, authoritative Knowledge, or vector search. |
 | Working State | Short-lived explicit runtime information required to continue the current Execution or TaskAttempt. | Deterministic current state, not long-term Memory. |
 | Conversation History | Recorded interaction history where relevant to a use case. | Not automatically Context or long-term Memory. |
-| Episodic Memory | Potential future retained record about a previous interaction, event, or Execution experience. | Experience-derived and scoped; not authoritative Knowledge. |
-| Semantic Memory | Potential future distilled/retrievable learned information derived from experiences. | Requires provenance, validation, conflict, and retention rules that are not yet decided. |
-| MemoryEntry | One future persisted, lifecycle-managed unit of Episodic or Semantic Memory. | Not a Stage 1 entity; candidate memories require later promotion/validation Policy. |
+| Episodic Memory | Reviewed retained record about a prior statement, observation, event, or Execution experience. | Experience-derived and scoped; not authoritative Knowledge. |
+| Semantic Memory | Reviewed retained generalized information derived from experience. | Stage 5 rejects unsupported model inference and requires human review. |
+| MemoryEntry | One lifecycle-managed unit of Episodic or Semantic Memory promoted from an exact candidate. | Immutable content/provenance; revocation and supersession preserve history. |
 | State | Explicit current domain/runtime condition required to continue, recover, or inspect work. | Canonical current state is not reconstructed solely from chat text, Events, or logs. |
 | Action | Typed requested operation selected by deterministic logic, Workflow logic, or an Agent. | A request—not a result, StateTransition, Event, or proof of external effect. |
 | Observation | Immutable typed information returned after an Action or external input, with provenance and trust classification. | Untrusted until validated; not automatically truth, instruction, or proof of success. |
