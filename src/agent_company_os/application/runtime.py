@@ -42,6 +42,7 @@ from agent_company_os.domain.transitions import StateTransition, SubjectType
 from agent_company_os.ports.clock import Clock
 from agent_company_os.ports.ids import IdGenerator
 from agent_company_os.ports.knowledge import KnowledgeRuntimePort
+from agent_company_os.ports.memory import MemoryRuntimePort
 from agent_company_os.ports.model import ModelPort
 from agent_company_os.ports.runtime_store import RuntimeStore
 from agent_company_os.ports.tools import ToolRuntimePort
@@ -68,6 +69,7 @@ class AgentRuntimeService:
         model: ModelPort,
         tools: ToolRuntimePort | None = None,
         knowledge: KnowledgeRuntimePort | None = None,
+        memory: MemoryRuntimePort | None = None,
     ) -> None:
         self.store = store
         self.clock = clock
@@ -75,6 +77,7 @@ class AgentRuntimeService:
         self.model = model
         self.tools = tools
         self.knowledge = knowledge
+        self.memory = memory
         self.domain = DomainService(store.domain, clock, ids)
         self.assembler = ContextAssembler()
         self.policy = ActionPolicy()
@@ -107,12 +110,16 @@ class AgentRuntimeService:
                 context,
                 self.clock.now(),
                 self.clock.now() + timedelta(seconds=limits.execution_seconds),
-                runtime_protocol="single-agent-knowledge-v1"
+                runtime_protocol="single-agent-memory-v1"
+                if definition.memory_access.scopes
+                else "single-agent-knowledge-v1"
                 if definition.knowledge_scope.source_ids
                 else "single-agent-tools-v1"
                 if ActionType.CALL_TOOL in definition.allowed_actions
                 else "single-agent-v1",
-                policy_version="bounded-knowledge-tools-v1"
+                policy_version="governed-memory-v1"
+                if definition.memory_access.scopes
+                else "bounded-knowledge-tools-v1"
                 if definition.knowledge_scope.source_ids
                 else "read-only-tools-v1"
                 if ActionType.CALL_TOOL in definition.allowed_actions
@@ -188,11 +195,14 @@ class AgentRuntimeService:
                         raise InvariantViolation("model_binding_changed")
                     tool_enabled = ActionType.CALL_TOOL in run.definition_version.allowed_actions
                     knowledge_enabled = bool(run.definition_version.knowledge_scope.source_ids)
+                    memory_enabled = bool(run.definition_version.memory_access.scopes)
                     if (
                         run.policy_version != self.policy.version_for(run)
                         or run.runtime_protocol
                         != (
-                            "single-agent-knowledge-v1"
+                            "single-agent-memory-v1"
+                            if memory_enabled
+                            else "single-agent-knowledge-v1"
                             if knowledge_enabled
                             else "single-agent-tools-v1"
                             if tool_enabled
@@ -215,6 +225,10 @@ class AgentRuntimeService:
                         and self.knowledge is None
                     ):
                         raise InvariantViolation("knowledge_adapter_required")
+                    if run.working_state.active_memory_pack_id is not None and self.memory is None:
+                        raise InvariantViolation("memory_adapter_required")
+                    if memory_enabled and self.memory is None:
+                        raise InvariantViolation("memory_adapter_required")
                     state = replace(
                         run.working_state,
                         iteration=run.working_state.iteration + 1,
@@ -228,6 +242,7 @@ class AgentRuntimeService:
                         snapshot.task,
                         self.tools.descriptors(claimed) if self.tools else (),
                         self.knowledge.active_pack(claimed) if self.knowledge else None,
+                        self.memory.active_pack(claimed) if self.memory else None,
                     )
                     started = self.clock.now()
                 # Never hold a store lock across a model call. Adapter is cooperative async.
@@ -249,6 +264,8 @@ class AgentRuntimeService:
                         self._deadline(current)
                         if self.knowledge:
                             self.knowledge.active_pack(current)
+                        if self.memory:
+                            self.memory.active_pack(current)
                         if self._parents(current).versions != snapshot.versions:
                             raise ModelFailure("version_conflict")
                         self.policy.authorize(current, decision)
@@ -278,6 +295,8 @@ class AgentRuntimeService:
                     self._deadline(current)
                     if self.knowledge:
                         self.knowledge.active_pack(current)
+                    if self.memory:
+                        self.memory.active_pack(current)
                     versions = (
                         self.store.domain.get_goal(current.goal_id).version,
                         self.store.domain.get_task(current.task_id).version,

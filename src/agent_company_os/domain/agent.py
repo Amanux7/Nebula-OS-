@@ -15,6 +15,7 @@ from agent_company_os.domain.ids import (
     WorkspaceId,
 )
 from agent_company_os.domain.knowledge import EvidencePackId, KnowledgeScope
+from agent_company_os.domain.memory import MemoryAccessPolicy, MemoryContextPackId
 from agent_company_os.domain.tools import ToolGrant, ToolObservationData
 from agent_company_os.domain.validation import clean_required_text, require_utc
 
@@ -61,10 +62,13 @@ class AgentDefinitionVersion:
     schema_version: int = 1
     allowed_tools: tuple[ToolGrant, ...] = ()
     knowledge_scope: KnowledgeScope = KnowledgeScope()
+    memory_access: MemoryAccessPolicy = MemoryAccessPolicy()
 
     def __post_init__(self) -> None:
         if not isinstance(self.knowledge_scope, KnowledgeScope):
             raise InvariantViolation("knowledge_scope_type")
+        if not isinstance(self.memory_access, MemoryAccessPolicy):
+            raise InvariantViolation("memory_access_policy_type")
         if (
             not isinstance(self.allowed_tools, tuple)
             or len(self.allowed_tools) > 3
@@ -132,9 +136,15 @@ class SuppliedContext:
     source_texts: tuple[SourceText, ...] = ()
 
     def __post_init__(self) -> None:
-        if any(fact.source_id.startswith(("tool_receipt:", "knowledge:")) for fact in self.facts):
+        if any(
+            fact.source_id.startswith(("tool_receipt:", "knowledge:", "memory:"))
+            for fact in self.facts
+        ):
             raise InvariantViolation("supplied_sources_cannot_impersonate_tool_receipts")
-        if any(s.source_id.startswith(("tool_receipt:", "knowledge:")) for s in self.source_texts):
+        if any(
+            s.source_id.startswith(("tool_receipt:", "knowledge:", "memory:"))
+            for s in self.source_texts
+        ):
             raise InvariantViolation("supplied_sources_cannot_impersonate_runtime_evidence")
         if not self.required_keys or len(set(self.required_keys)) != len(self.required_keys):
             raise InvariantViolation("required_fact_keys_unique_nonempty")
@@ -199,6 +209,7 @@ class AgentWorkingState:
     missing_fields: tuple[str, ...] = ()
     invocation_pending: bool = False
     active_evidence_pack_id: EvidencePackId | None = None
+    active_memory_pack_id: MemoryContextPackId | None = None
 
     def __post_init__(self) -> None:
         if (

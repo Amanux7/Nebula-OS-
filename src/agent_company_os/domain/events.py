@@ -13,6 +13,14 @@ from agent_company_os.domain.validation import clean_required_text, require_utc
 
 
 class EventType(StrEnum):
+    MEMORY_CANDIDATE_CREATED = "memory_candidate_created"
+    MEMORY_REVIEW_REQUESTED = "memory_review_requested"
+    MEMORY_CANDIDATE_REJECTED = "memory_candidate_rejected"
+    MEMORY_PROMOTED = "memory_promoted"
+    MEMORY_REVOKED = "memory_revoked"
+    MEMORY_SUPERSEDED = "memory_superseded"
+    MEMORY_RETRIEVED = "memory_retrieved"
+    MEMORY_CONTEXT_PACK_CREATED = "memory_context_pack_created"
     KNOWLEDGE_SOURCE_PUBLISHED = "knowledge_source_published"
     KNOWLEDGE_SOURCE_DISABLED = "knowledge_source_disabled"
     KNOWLEDGE_QUERY_EXECUTED = "knowledge_query_executed"

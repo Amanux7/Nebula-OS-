@@ -11,6 +11,8 @@ from agent_company_os.domain.validation import clean_required_text, require_utc
 
 
 class SubjectType(StrEnum):
+    MEMORY_CANDIDATE = "memory_candidate"
+    MEMORY_ENTRY = "memory_entry"
     KNOWLEDGE_SOURCE = "knowledge_source"
     AGENT_RUN = "agent_run"
     GOAL = "goal"

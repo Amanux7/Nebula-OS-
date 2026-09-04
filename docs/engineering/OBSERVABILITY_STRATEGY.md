@@ -1,5 +1,15 @@
 # Observability Strategy
 
+## Stage 5 memory signals
+
+Minimal audit Events record candidate creation, review request, rejection, promotion,
+revocation, supersession, retrieval, and context-pack creation. Retrieval metadata
+includes exact pack ID, strategy version, returned count, and bounded character count;
+run Events continue to carry exact definition/runtime/policy versions. Candidate and
+entry records retain provenance and reviewer identity without storing hidden model
+reasoning. Secret or full-context logging is prohibited. Event records aid audit and
+future projections but do not make the application event sourced.
+
 ## Objectives
 
 Observability must let users and operators answer: what ran, under which version and authority, what state changed, which dependencies were used, what failed, what it cost, and whether the outcome was acceptable. It supports diagnosis and audit but does not replace canonical execution state.

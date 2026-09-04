@@ -2,6 +2,17 @@
 
 ## Purpose and constraints
 
+### Implemented Stage 5 boundary
+
+[ADR-008](ADR/ADR-008-governed-memory.md) adds a governed Memory application
+capability. Host-derived candidates pass deterministic policy and human review before
+becoming retained entries. Exact AgentDefinitionVersion grants constrain retrieval;
+MemoryContextPacks enter a dedicated runtime context field and are revalidated around
+model invocation. They never replace Knowledge, EvidencePacks, receipts, Working
+State, or conversation history. The implementation remains one modular process with
+an in-memory adapter; the broader orchestration and infrastructure diagrams remain
+target architecture.
+
 ### Implemented Stage 4 boundary
 
 [ADR-007](ADR/ADR-007-company-brain-and-knowledge-retrieval.md) adds KnowledgeService

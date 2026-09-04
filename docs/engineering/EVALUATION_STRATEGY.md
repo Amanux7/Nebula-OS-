@@ -1,5 +1,20 @@
 # Agent Evaluation Strategy
 
+## Stage 5 memory evaluation
+
+`tests/fixtures/agent_eval/memory_cases.json` is the initial versioned offline set. It
+separates eligibility from truth and covers user statements, tool observations, task
+results, semantic candidates, sensitivity classes, unsupported model inference,
+Knowledge duplication, and detectable secrets. Additional integration fixtures prove
+that reviewed memory appears as a separately labeled context pack, conflicts remain
+visible, Knowledge retains precedence, and a `memory:` reference cannot satisfy the
+exact grounding evaluator.
+
+The lexical score measures only query overlap after exact subject/scope filtering.
+It is not a confidence or correctness score. “Memory improves quality” remains a
+future live-model/human-evaluation question; Stage 5 establishes safety and
+reproducibility, not a production answer-quality claim.
+
 ## Unit test != agent evaluation
 
 Stage 2 seeds `tests/fixtures/agent_eval/cases.json` (schema version 1) with

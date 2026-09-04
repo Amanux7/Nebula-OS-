@@ -1,5 +1,16 @@
 # Testing Strategy
 
+## Stage 5 governed-memory gate
+
+The offline suite adds deterministic tests for candidate policy/review, episodic and
+semantic promotion, canonical provenance, duplicate suppression, immutable history,
+expiry, revocation, supersession, conflicting memories, Knowledge precedence,
+sensitivity grants, query/content/pack bounds, cross-workspace denial, stale Versions,
+forged retriever output, atomic rollback, runtime revocation races, serialization, and
+the rule that Memory cannot ground completion. A versioned 12-case policy fixture
+covers normal and adversarial candidates. No live model, vector service, or database
+is needed.
+
 ## Objectives
 
 Stage 2 implementation evidence is in [Stage 2 report](../STAGE_2_REPORT.md).
