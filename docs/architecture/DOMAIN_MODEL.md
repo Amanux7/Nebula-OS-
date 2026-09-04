@@ -1,5 +1,39 @@
 # Domain Model
 
+## Implemented Stage 6 orchestration model
+
+Stage 6 adds coordination records without changing the canonical Goal, Task,
+TaskAttempt, Execution, or AgentRun meanings:
+
+- `OrchestrationRun` is a bounded coordinator lifecycle for one Goal and policy.
+- `PlanProposal` is untrusted strategy output. Validation checks workspace, limits,
+  unique logical task IDs, known dependencies, acyclicity, depth, and the existence of
+  at least one eligible agent before acceptance.
+- `PlanVersion` is an immutable accepted snapshot. Replanning appends a version; it
+  never edits history. Stage 6 replans may add or refine retained logical tasks but
+  cannot remove a task already represented by an earlier accepted plan.
+- `PlanMaterialization` records the one-time mapping from logical planned-task IDs to
+  canonical Task IDs and an Execution. Repeated materialization returns that mapping.
+- `Delegation` assigns one ready Task to one exact published
+  `AgentDefinitionVersion`. It is not permission delegation and carries no authority.
+- `DelegationAttempt` links that assignment to exact Execution, TaskAttempt, and
+  AgentRun records.
+- `TaskResultReference` names the exact successful lineage available to dependent
+  tasks. Downstream content remains data, never instructions or authority.
+
+The OrchestrationRun lifecycle is `planning → running → waiting | completed | failed |
+cancelled`. `waiting` is recoverable through an explicit replan, retry, or delegation
+after the blocking condition changes. Completion is explicit and requires every
+materialized Task to be complete plus structural result aggregation. Goal satisfaction
+continues to be decided by the canonical domain service.
+
+Additional invariants are enforced: accepted plans are workspace-local and bounded;
+dependency readiness is derived rather than mutable; each plan version is immutable;
+materialization occurs once; a Task can have at most one active delegation; retries
+create new TaskAttempts; selection can only narrow exact published definition grants;
+stale Goal, plan, entity, or agent-definition versions fail; and cancellation prevents
+new work from becoming ready. Planner output cannot mutate domain state directly.
+
 ## Implemented Stage 5 governed-memory model
 
 `MemoryCandidate` is a workspace/run-bound proposal derived by trusted host code from

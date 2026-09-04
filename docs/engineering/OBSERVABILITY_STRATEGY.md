@@ -1,5 +1,15 @@
 # Observability Strategy
 
+## Stage 6 orchestration signals
+
+Audit Events now identify orchestration start, plan proposal/rejection/acceptance and
+materialization, delegation/rejection, replan request/completion, and orchestration
+completion/failure/cancellation. Correlation uses workspace, Goal, OrchestrationRun,
+PlanVersion, logical planned task, canonical Task, Delegation, Execution, TaskAttempt,
+AgentRun, and exact AgentDefinitionVersion identifiers. TaskResultReferences preserve
+successful upstream lineage. Event records are bounded audit history, not event sourcing,
+message delivery, logs of hidden reasoning, or proof of durable distributed execution.
+
 ## Stage 5 memory signals
 
 Minimal audit Events record candidate creation, review request, rejection, promotion,

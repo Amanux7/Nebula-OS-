@@ -1,5 +1,23 @@
 # Glossary
 
+## Stage 6 orchestration vocabulary
+
+| Term | Definition | Boundary |
+|---|---|---|
+| Orchestration | Bounded application coordination that validates a plan, materializes canonical Tasks, delegates ready work, and checks completion. | Not Agent Runtime, planning intelligence, a queue, or an authority source. |
+| OrchestrationStrategyPort | Replaceable asynchronous boundary that proposes a plan from a minimal typed request. | Its output is untrusted and cannot mutate domain state. |
+| PlanProposal | Strategy-proposed ordered logical Tasks, dependencies, and requirements. | Not canonical state or an accepted plan. |
+| PlanVersion | Immutable validated plan snapshot with monotonically increasing version and policy lineage. | Replanning appends history; it does not edit an accepted version. |
+| PlannedTask | Logical task specification inside a PlanVersion. | Becomes a canonical Task only through materialization. |
+| PlanMaterialization | Exact mapping of one PlanVersion's logical task IDs to canonical Tasks and an Execution. | Happens at most once per plan version. |
+| OrchestrationRun | Bounded lifecycle coordinating one Goal under one strategy and policy. | Does not replace Goal, Execution, or AgentRun. |
+| Agent requirements | Capabilities and exact tool/Knowledge/Memory/autonomy constraints required for a PlannedTask. | Requirements can narrow selection; they cannot grant authority. |
+| AgentSelector | Deterministic policy component choosing an eligible exact published AgentDefinitionVersion. | Separate from planning and runtime execution. |
+| Delegation | Assignment of one ready canonical Task to one exact AgentDefinitionVersion under a PlanVersion. | Not a message, permission grant, or TaskAttempt. |
+| DelegationAttempt | Link from a Delegation to its exact Execution, TaskAttempt, and AgentRun. | Preserves retry/redelegation history. |
+| TaskResultReference | Exact successful upstream Task/TaskAttempt/AgentRun result lineage made available to dependent work. | Referenced content is supplied data, not instructions, policy, or Knowledge. |
+| ResultAggregator | Deterministic structural checker that confirms required Task results exist before Goal completion is requested. | Does not judge semantic output quality. |
+
 This file is the canonical terminology reference. Documents should link here rather than invent local synonyms.
 
 ## Stage 5 precise memory vocabulary

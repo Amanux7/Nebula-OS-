@@ -2,6 +2,26 @@
 
 These decisions are intentionally unresolved. “Target stage” indicates when evidence is expected, not a deadline to decide prematurely.
 
+## Stage 6 decision updates
+
+- OQ-005: ADR-009 selects a replaceable strategy port and ships a deterministic
+  research/analysis/report strategy plus a scripted fake. Whether and where to use a
+  model-driven or hybrid planner remains an evaluation question, not a domain change.
+- OQ-006/007: accepted plans are immutable bounded DAG snapshots; readiness is derived
+  from canonical Task completion. Stage 6 uses in-process orchestration state and does
+  not select a durable workflow system.
+- OQ-031: runtime failure does not automatically fail a Goal. Bounded retry,
+  redelegation, and replan may recover; otherwise the OrchestrationRun waits with an
+  escalation reason. Partial Goal satisfaction and compensation remain unresolved.
+- OQ-029/030: Stage 6 adds typed proposal/delegation/result records and minimal audit
+  Events without introducing a generic ExecutionStep or event sourcing.
+
+New questions: what business evidence warrants model-driven planning; whether accepted
+plans may supersede/remove already materialized Tasks; how semantic result quality and
+partial success are judged; what durable claim/lease/recovery protocol is needed for
+distributed workers; and how Stage 7 messages differ from Delegations and result
+references. No queue, workflow engine, planning framework, or planner model is selected.
+
 ## Stage 5 decision updates
 
 - OQ-012: ADR-008 selects explicit exact scope/sensitivity grants on immutable

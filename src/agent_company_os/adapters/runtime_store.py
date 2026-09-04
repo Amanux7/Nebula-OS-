@@ -158,6 +158,14 @@ class InMemoryRuntimeStore:
         self._scope(workspace_id, definition.definition.workspace_id)
         return definition
 
+    def definitions(self, workspace_id: WorkspaceId) -> tuple[AgentDefinitionVersion, ...]:
+        self.domain.get_workspace(workspace_id)
+        return tuple(
+            definition
+            for definition in self._definitions.values()
+            if definition.definition.workspace_id == workspace_id
+        )
+
     @staticmethod
     def _scope(expected: WorkspaceId, actual: WorkspaceId) -> None:
         if expected != actual:
@@ -173,6 +181,13 @@ class InMemoryRuntimeStore:
 
     def for_attempt(self, attempt_id: TaskAttemptId) -> tuple[AgentRun, ...]:
         return tuple(run for run in self._runs.values() if run.task_attempt_id == attempt_id)
+
+    def for_definition(self, definition_id: AgentDefinitionId) -> tuple[AgentRun, ...]:
+        return tuple(
+            run
+            for run in self._runs.values()
+            if run.definition_version.definition.id == definition_id
+        )
 
     def add_run(self, run: AgentRun) -> None:
         with self.atomic():

@@ -63,12 +63,28 @@ class AgentDefinitionVersion:
     allowed_tools: tuple[ToolGrant, ...] = ()
     knowledge_scope: KnowledgeScope = KnowledgeScope()
     memory_access: MemoryAccessPolicy = MemoryAccessPolicy()
+    capabilities: tuple[str, ...] = ()
+    enabled: bool = True
 
     def __post_init__(self) -> None:
         if not isinstance(self.knowledge_scope, KnowledgeScope):
             raise InvariantViolation("knowledge_scope_type")
         if not isinstance(self.memory_access, MemoryAccessPolicy):
             raise InvariantViolation("memory_access_policy_type")
+        if (
+            not isinstance(self.capabilities, tuple)
+            or len(self.capabilities) > 10
+            or len(set(self.capabilities)) != len(self.capabilities)
+            or any(
+                not isinstance(capability, str)
+                or not capability
+                or len(capability) > 64
+                or capability != capability.casefold()
+                for capability in self.capabilities
+            )
+            or type(self.enabled) is not bool
+        ):
+            raise InvariantViolation("agent_capability_catalog")
         if (
             not isinstance(self.allowed_tools, tuple)
             or len(self.allowed_tools) > 3

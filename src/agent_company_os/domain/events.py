@@ -13,6 +13,18 @@ from agent_company_os.domain.validation import clean_required_text, require_utc
 
 
 class EventType(StrEnum):
+    ORCHESTRATION_STARTED = "orchestration_started"
+    PLAN_PROPOSED = "plan_proposed"
+    PLAN_REJECTED = "plan_rejected"
+    PLAN_ACCEPTED = "plan_accepted"
+    PLAN_MATERIALIZED = "plan_materialized"
+    TASK_DELEGATED = "task_delegated"
+    DELEGATION_REJECTED = "delegation_rejected"
+    REPLAN_REQUESTED = "replan_requested"
+    REPLAN_COMPLETED = "replan_completed"
+    ORCHESTRATION_COMPLETED = "orchestration_completed"
+    ORCHESTRATION_FAILED = "orchestration_failed"
+    ORCHESTRATION_CANCELLED = "orchestration_cancelled"
     MEMORY_CANDIDATE_CREATED = "memory_candidate_created"
     MEMORY_REVIEW_REQUESTED = "memory_review_requested"
     MEMORY_CANDIDATE_REJECTED = "memory_candidate_rejected"

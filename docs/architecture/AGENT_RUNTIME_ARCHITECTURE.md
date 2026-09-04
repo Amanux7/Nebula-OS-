@@ -1,5 +1,22 @@
 # Agent Runtime Architecture
 
+## Stage 6 orchestration integration
+
+Orchestration calls the existing `AgentRuntimeService`; it does not replace or duplicate
+the decision loop. An accepted plan is materialized into canonical Tasks. For each ready
+Task, deterministic selection binds a `Delegation` to an exact published
+`AgentDefinitionVersion`, and runtime execution creates the normal TaskAttempt,
+AgentRun, Action, Observation, Event, and result records. Upstream outputs enter a
+dependent run only as bounded `SuppliedContext` facts with exact `TaskResultReference`
+lineage. They cannot change tools, Knowledge, Memory, autonomy, or policy.
+
+Runtime failure preserves the existing retry contract: the failed TaskAttempt and
+AgentRun remain historical, while the logical Task returns to `ready`. Orchestration
+may create a bounded retry/redelegation or request a replan. Exhausted limits move the
+OrchestrationRun to `waiting` with an explicit escalation reason. Completion remains a
+domain decision after all canonical Tasks complete; aggregate count is not an agent
+judgment and does not bypass Goal acceptance criteria.
+
 ## Stage 5 memory integration
 
 Memory-enabled AgentDefinitionVersions carry exact `MemoryAccessPolicy` grants. The
