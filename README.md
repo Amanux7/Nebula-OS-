@@ -11,10 +11,14 @@ scoped capabilities, and evidence behind every accepted result.
 
 > **AI for judgment. Software for guarantees.**
 
-**Current milestone: Stage 6 — Replaceable Orchestration and Delegation.** The
+**Current milestone: Stage 9 — Human Approval and Consequential Action Governance.** The
 repository implements a deterministic domain foundation, a bounded single-agent
 runtime, controlled read-only tools, source-aware Knowledge, reviewed scoped Memory,
-and a replaceable orchestration layer that validates plans and delegates ready work.
+replaceable orchestration, and governed point-to-point communication with explicit
+handoffs and reference re-authorization. A versioned organization now provides
+department, role, and capability discovery with explicit routing restrictions.
+Exact action intents, single-use human approvals, and bounded autonomy now govern
+one offline write-style fixture, with current-state revalidation before dispatch.
 It is an early-stage engineering foundation,
 not a deployed autonomous company or a production-ready AI service.
 
@@ -76,9 +80,12 @@ cannot grant permissions, bypass domain invariants, or certify its own success.
 | Company Brain | Versioned text/Markdown/structured facts, source grants, lexical retrieval, and immutable EvidencePacks |
 | Governed Memory | Host-derived candidates, mandatory human review, scoped Episodic/Semantic entries, lifecycle controls, and immutable MemoryContextPacks |
 | Replaceable orchestration | Validated immutable plan versions, one-time materialization, dependency readiness, deterministic agent selection, bounded replan/retry/delegation, and explicit result lineage |
+| Governed communication | Typed point-to-point messages, exact correlation and participant versions, recipient-scoped references, bounded context, and orchestration-mediated handoffs |
 | Grounded completion | Exact findings checked against supplied facts, successful tool receipts, or active same-run knowledge evidence |
 | Failure handling | Timeouts, budgets, duplicate-invocation protection, stale-result rejection, and atomic rollback |
-| Verification | 286 passing tests at the Stage 6 gate, plus formatting, lint, and strict type checks |
+| Organization | Immutable graph versions, effective memberships, governed reporting, registry discovery, and department policy |
+| Governance | Exact payload fingerprints, explicit reviewers, expiry/revocation, one-use approval, and bounded Level 3 fixture execution |
+| Verification | 444 passing tests at the Stage 9 gate, plus formatting, lint, and strict type checks |
 
 The only supplied agent type is the **Research Brief Agent**. It can operate on
 approved supplied facts or receive an immutable definition upgrade granting the
@@ -99,6 +106,8 @@ flowchart TD
     orchestrator -->|"Validate + materialize"| domainService
     orchestrator -->|"Select eligible definition"| selector["AgentSelector"]
     orchestrator -->|"Delegate ready task"| agentRuntime
+    communication["AgentCommunicationService"] -->|"Typed message context"| agentRuntime
+    communication -->|"Validated handoff request"| orchestrator
     agentRuntime -->|"Domain commands"| domainService
     domainService -->|"Enforces invariants"| domain["Typed domain entities"]
     agentRuntime -->|"ModelPort"| model["Scripted FakeModel"]
@@ -209,6 +218,25 @@ already materialized work in Stage 6. The implementation is synchronous and in-m
 it is not a durable workflow engine, queue, multi-agent chat system, or live-model
 planner. See [ADR-009](docs/architecture/ADR/ADR-009-replaceable-orchestration-and-delegation.md).
 
+### Multi-agent communication and handoffs
+
+Active participants in the same OrchestrationRun may exchange typed, bounded
+point-to-point messages when both exact AgentDefinitionVersions opt in and deterministic
+role policy permits the recipient. Requests and responses carry explicit correlation;
+all sender/recipient, Task, Delegation, policy, schema, and provenance versions remain
+historical. References to Task results, tool receipts, Knowledge, or Memory are checked
+again against the recipient's own grants before delivery.
+
+A substantial-work request becomes a `HandoffRequest`, not hidden message work. The
+existing selector and orchestrator resolve it into a normal redelegation, and completion
+links to the resulting canonical TaskResultReference. Messages enter model input through
+a separate bounded `agent_messages` section labeled as untrusted agent content; they do
+not grant tools, become Knowledge, auto-promote to Memory, or ground completion.
+
+The default is direct in-process delivery: no broadcast, pub/sub, inbox polling, shared
+blackboard, message broker, external provider, or free-form chat. See
+[ADR-010](docs/architecture/ADR/ADR-010-multi-agent-communication-and-handoffs.md).
+
 The [System Architecture](docs/architecture/SYSTEM_ARCHITECTURE.md) describes the
 broader target design. Its multi-agent communication, organization UI, approval,
 external integration, and production infrastructure layers must not be mistaken for
@@ -234,6 +262,8 @@ implemented services.
 | OrchestrationRun | Bounded coordinator state for planning, materialization, delegation, and completion |
 | Delegation | Assignment of one canonical Task to one exact AgentDefinitionVersion |
 | TaskResultReference | Exact successful TaskAttempt/AgentRun result lineage used by downstream work |
+| AgentMessage | Immutable typed point-to-point envelope with exact participant lineage |
+| HandoffRequest | Governed request for substantial-work transfer through orchestration |
 
 See the [Domain Model](docs/architecture/DOMAIN_MODEL.md) and
 [Glossary](docs/project/GLOSSARY.md) for complete definitions.
@@ -274,9 +304,26 @@ is a separate explicit operation.
 |---|---|---|
 | Company Fact Lookup | `company_name` | Approved fixture facts for that company |
 | Source Fact Lookup | `source_id` and unique `keys` | Matching approved source facts |
+| Send Fixture Message | Exact `destination` and `message` | Governed local fixture delivery and observed receipt; no real message sent |
 
-Both are deterministic, read-only, and offline. A fake executor additionally supports
+The two lookups are read-only; all three capabilities are deterministic and offline.
+The write-style fixture requires an independent Tool grant plus exact approval at
+Level 2, or explicit bounded policy at Level 3. A fake executor additionally supports
 scripted errors, timeouts, blocked calls, and captured inputs for tests.
+
+### Consequential-action governance
+
+A validated Tool proposal becomes an immutable ActionIntent bound to its actor,
+workspace, exact tool version, destination, payload fingerprint, risk, and policy.
+Human approval applies to that intent only. Before dispatch the runtime rechecks
+current policy, expiry, revocation, grants, organization, and active work. It reserves
+the intent with the ToolInvocation claim, preventing duplicate dispatch.
+
+Approval waits preserve the same work identity, deadline, and budgets. Rejection
+performs no write; timeout or cancellation after dispatch never proves no write occurred.
+Managers are not automatic approvers, and Level 4/high-risk actions remain denied.
+See [ADR-012](docs/architecture/ADR/ADR-012-human-approval-autonomy-and-consequential-actions.md)
+and the [Stage 9 report](docs/STAGE_9_REPORT.md) for exact guarantees and limitations.
 
 ### Safety defaults
 
@@ -367,11 +414,27 @@ lint, type checking, and tests on pushes and pull requests. The test phase is of
 and secret-free; dependency installation still uses package downloads. The CI badge
 above tracks `main`, not unmerged pull-request branches.
 
-The [Stage 6 report](docs/STAGE_6_REPORT.md) records **286 passing tests**, including
-40 orchestration cases covering DAG validation, scheduling, exact-version eligibility,
-dependency blocking, retries, redelegation, replanning, cancellation, stale versions,
-injection, atomic rollback, completion, and lineage. Passing scripted tests establishes
-software behavior—not live-model planning or answer quality.
+### Review workflow
+
+Changes are developed on focused `codex/*` branches and reviewed through GitHub pull
+requests. Each pull request should include a concise scope statement, linked ADRs or
+requirements for architectural changes, deterministic test evidence, security and
+data-boundary notes, and explicit deferred work. Reviewers can reproduce the local gate
+with the commands above; CI repeats the same checks without secrets, paid APIs, live
+models, or external services.
+
+Use the repository's [open pull requests](https://github.com/Amanux7/Nebula-OS-/pulls)
+page to review published changes. The [Stage 9 report](docs/STAGE_9_REPORT.md)
+summarizes the current local implementation, verification results, risks, and deferred work.
+
+The [Stage 7 report](docs/STAGE_7_REPORT.md) records **331 passing tests**, including
+the A–AD communication/handoff matrix and Stage 6 review regression cases. Passing
+scripted tests establishes software behavior—not live-model planning, communication
+usefulness, or answer quality.
+
+The Stage 8 gate extends that baseline to 386 passing tests. Stage 9 adds 58 governance
+cases, for **444 passing tests**, including exact approval, organization-aware
+wait/resume, rejection, replay, rollback, and uncertain-outcome scenarios.
 
 Run the Company Brain scenarios alone with `python -m pytest tests/test_knowledge.py -q`.
 The fictional Aurora Desk corpus demonstrates missing-context recovery, version updates,
@@ -415,8 +478,11 @@ bounded retrieval, and combined knowledge/tool evidence without network calls.
 | 4 | Company Brain / Knowledge Retrieval | Implemented and verified offline |
 | 5 | Governed Memory | Implemented and verified offline |
 | 6 | Replaceable orchestration and delegation | Implemented and verified offline |
-| 7–9 | Communication, organization, and human approval | Planned |
-| 10–13 | Observability UI, evaluation hardening, integrations, and production | Planned |
+| 7 | Multi-agent communication and handoffs | Implemented and verified offline |
+| 8 | Departments, registry, and organization graph | Implemented and verified offline |
+| 9 | Human approval and consequential-action governance | Implemented and verified offline |
+| 10 | Reliability, recovery, and audit-query foundations | Recommended next; not started |
+| Later | Observability/approval UI, evaluations, integrations, and production | Deferred pending evidence |
 
 Stages are evidence gates, not release dates. Planning may eventually be deterministic,
 agentic, or hybrid; Stage 6 selects a replaceable seam and deterministic baseline, not
@@ -425,19 +491,19 @@ See the [Development Roadmap](docs/engineering/DEVELOPMENT_ROADMAP.md).
 
 ## Security and known limitations
 
-- **No external writes:** no email, Slack, database mutation, shell, filesystem,
+- **No production external writes:** no email, Slack, database mutation, shell, filesystem,
   browser, payment, or purchase tools are implemented.
 - **No live AI or integrations:** no live model provider, OAuth connector, or MCP runtime.
 - **Knowledge is a lexical baseline:** no embeddings, semantic ranking, automatic
-  crawling, generic document parser, learned memory, or multi-agent communication.
+  crawling or generic document parser. Memory and communication are separate governed capabilities.
 - **In-memory persistence:** history disappears on process exit; durable recovery
   and production retention/deletion policies remain unresolved.
 - **Cooperative adapters:** async timeouts require nonblocking, cancellation-aware
   executors. The runtime is not a sandbox for hostile Python code.
 - **Provenance is not truth:** receipts establish observed inputs and outputs,
   not source correctness, freshness, or semantic entailment.
-- **Trusted application callers:** production authentication, fine-grained resource
-  scopes, approval enforcement, and operational hardening remain future work.
+- **Trusted application callers:** reviewer identity is explicit but not production-authenticated.
+  Governance covers one fixture capability, not production security or distributed exactly-once writes.
 
 Tool output and retrieved text are data, never instructions to broaden authority. Credentials must
 remain outside model context when future integrations are introduced. Read the
@@ -453,7 +519,7 @@ remain outside model context when future integrations are introduced. Read the
 | Domain and system design | [Domain Model](docs/architecture/DOMAIN_MODEL.md), [System Architecture](docs/architecture/SYSTEM_ARCHITECTURE.md), [Agent Runtime](docs/architecture/AGENT_RUNTIME_ARCHITECTURE.md), [Data Architecture](docs/architecture/DATA_ARCHITECTURE.md) |
 | Engineering standards | [Principles](docs/engineering/ENGINEERING_PRINCIPLES.md), [testing](docs/engineering/TESTING_STRATEGY.md), [evaluation](docs/engineering/EVALUATION_STRATEGY.md), [observability](docs/engineering/OBSERVABILITY_STRATEGY.md) |
 | Shared terminology | [Glossary](docs/project/GLOSSARY.md), [assumptions](docs/project/ASSUMPTIONS.md), [open questions](docs/project/OPEN_QUESTIONS.md) |
-| Implementation evidence | [Stage 1](docs/STAGE_1_REPORT.md), [Stage 2](docs/STAGE_2_REPORT.md), [Stage 3](docs/STAGE_3_REPORT.md), [Stage 4](docs/STAGE_4_REPORT.md), [Stage 5](docs/STAGE_5_REPORT.md), [Stage 6](docs/STAGE_6_REPORT.md) |
+| Implementation evidence | [Stage 1](docs/STAGE_1_REPORT.md), [Stage 2](docs/STAGE_2_REPORT.md), [Stage 3](docs/STAGE_3_REPORT.md), [Stage 4](docs/STAGE_4_REPORT.md), [Stage 5](docs/STAGE_5_REPORT.md), [Stage 6](docs/STAGE_6_REPORT.md), [Stage 7](docs/STAGE_7_REPORT.md), [Stage 8](docs/STAGE_8_REPORT.md), [Stage 9](docs/STAGE_9_REPORT.md) |
 | Foundation history | [Stage 0](docs/STAGE_0_REPORT.md), [Stage 0.1](docs/STAGE_0_1_REFINEMENT_REPORT.md) |
 
 Key decisions: [architecture principles](docs/architecture/ADR/ADR-001-architecture-principles.md),
@@ -463,8 +529,33 @@ Key decisions: [architecture principles](docs/architecture/ADR/ADR-001-architect
 [single-agent protocol](docs/architecture/ADR/ADR-005-single-agent-runtime.md),
 [Tool Runtime](docs/architecture/ADR/ADR-006-tool-runtime.md),
 [Company Brain](docs/architecture/ADR/ADR-007-company-brain-and-knowledge-retrieval.md),
-[governed Memory](docs/architecture/ADR/ADR-008-governed-memory.md), and
-[replaceable orchestration](docs/architecture/ADR/ADR-009-replaceable-orchestration-and-delegation.md).
+[governed Memory](docs/architecture/ADR/ADR-008-governed-memory.md),
+[replaceable orchestration](docs/architecture/ADR/ADR-009-replaceable-orchestration-and-delegation.md), and
+[governed communication](docs/architecture/ADR/ADR-010-multi-agent-communication-and-handoffs.md), and
+[organizational structure](docs/architecture/ADR/ADR-011-departments-agent-registry-and-organizational-graph.md).
+
+### Organization-aware work
+
+The fictional Aurora Desk demo discovers Research, Product, and Marketing agents from
+canonical capability IDs and explicit memberships. Each orchestration pins the exact
+organization version. Registry discovery feeds the existing selector; all runtime grants
+remain independently enforced. A department lead is an escalation destination and does
+not inherit anyone else's permissions.
+
+```mermaid
+flowchart LR
+    G[Organization Graph Version] --> D[Departments and Memberships]
+    D --> R[Agent Registry]
+    R --> S[AgentSelector]
+    S --> A[Canonical Delegation]
+    A --> E[AgentRun]
+    P[Organization Policy] -. narrows routing .-> S
+    P -. narrows messages and handoffs .-> E
+```
+
+See the [Stage 8 report](docs/STAGE_8_REPORT.md) for test evidence, exact bounds,
+historical-version behavior, and the complete file inventory. Administration remains
+trusted host code and storage remains in memory.
 
 ## Contributing
 

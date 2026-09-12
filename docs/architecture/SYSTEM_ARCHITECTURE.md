@@ -1,5 +1,33 @@
 # System Architecture
 
+## Stage 9 consequential-action governance
+
+GovernanceService evaluates exact consequential proposals and handles trusted-host
+review/revocation/cancellation. ToolRuntimeService remains the only execution path;
+it validates independent Tool authority and atomically reserves approval with the
+ToolInvocation claim. RuntimeStore includes governance in its shared rollback boundary.
+One offline FixtureMessageExecutor exercises the write-style contract. No production
+connector, authentication service, policy engine, or new infrastructure is added.
+
+## Stage 8 organizational foundation
+
+OrganizationService owns host-driven publication, validation, and atomic activation.
+AgentRegistry returns exact canonical candidate definitions through AgentRegistryPort;
+the existing AgentSelector still selects the final eligible definition. Orchestration
+pins the graph at start and rechecks eligibility before execution. Department policy
+narrows delegation, messages, and handoffs. OrganizationStore is an in-memory adapter
+sharing the runtime transaction boundary. No new execution engine or infrastructure
+is introduced. Handoffs preserve original Task requirements as well as target filters.
+
+## Implemented Stage 7 communication boundary
+
+`AgentCommunicationService` is a typed application boundary beside—not inside—planning,
+Tool Runtime, Knowledge, or Memory. It validates point-to-point participants, exact role
+grants, schemas, bounds, correlations, references, and deadlines before an atomic
+in-process delivery. `CommunicationStore` shares the orchestration/runtime rollback
+boundary. Handoff resolution calls the existing selector and OrchestrationService to
+create a normal Delegation; communication never becomes a scheduler or authority source.
+
 ## Implemented Stage 6 orchestration boundary
 
 `OrchestrationService` is an application-layer coordinator above the existing domain

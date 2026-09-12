@@ -26,6 +26,9 @@ def serialize_run(run: AgentRun) -> dict[str, object]:
         "agent_definition_version": run.definition_version.version.value,
         "model_name": run.definition_version.model_name,
         "policy_version": run.policy_version,
+        "organization_version": run.organization_version.value
+        if run.organization_version
+        else None,
         "runtime_protocol": run.runtime_protocol,
         "evaluator_version": run.evaluator_version,
         "version": run.version.value,

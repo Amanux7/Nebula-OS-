@@ -28,9 +28,11 @@ from agent_company_os.domain.errors import (
 from agent_company_os.domain.events import Event, EventType
 from agent_company_os.domain.execution import ExecutionStatus
 from agent_company_os.domain.goal import GoalStatus
+from agent_company_os.domain.governance import ActionIntentId
 from agent_company_os.domain.ids import GoalId, TaskId, Version, WorkspaceId
 from agent_company_os.domain.orchestration import (
     AgentCatalogItem,
+    AgentRequirements,
     Delegation,
     DelegationAttempt,
     DelegationId,
@@ -46,6 +48,8 @@ from agent_company_os.domain.orchestration import (
     PlanVersion,
     TaskResultReference,
 )
+from agent_company_os.domain.organization import RegistryQuery, RouteKind
+from agent_company_os.domain.organization_ids import DepartmentId
 from agent_company_os.domain.plan_validation import validate_plan
 from agent_company_os.domain.task import Task, TaskStatus
 from agent_company_os.domain.transitions import SubjectType
@@ -57,6 +61,7 @@ from agent_company_os.ports.orchestration import (
     OrchestrationStrategyPort,
     ResultAggregator,
 )
+from agent_company_os.ports.organization import AgentRegistryPort
 
 
 class OrchestrationService:
@@ -69,13 +74,15 @@ class OrchestrationService:
         runtime: AgentRuntimeService,
         clock: Clock,
         ids: IdGenerator,
+        registry: AgentRegistryPort | None = None,
     ) -> None:
         self.store, self.strategy, self.selector = store, strategy, selector
         self.aggregator, self.runtime = aggregator, runtime
         self.clock, self.ids = clock, ids
+        self.registry = registry
         self.domain = DomainService(store.runtime.domain, clock, ids)
 
-    def _latest_definitions(
+    def definitions_for_policy(
         self, workspace_id: WorkspaceId, policy: OrchestrationPolicy
     ) -> tuple[AgentDefinitionVersion, ...]:
         latest: dict[object, AgentDefinitionVersion] = {}
@@ -112,15 +119,146 @@ class OrchestrationService:
                 item.knowledge_scope.source_ids,
                 item.memory_access.scopes,
                 item.autonomy_ceiling,
+                item.capability_ids,
             )
             for item in definitions
         )
+
+    def candidates(
+        self, run: OrchestrationRun, requirements: AgentRequirements
+    ) -> tuple[AgentDefinitionVersion, ...]:
+        if run.organization is None:
+            if (
+                requirements.capability_ids
+                or requirements.required_department
+                or requirements.preferred_department
+                or requirements.organizational_role
+                or run.source_department
+            ):
+                raise InvariantViolation("organization_required")
+            return self.definitions_for_policy(run.workspace_id, run.policy)
+        if self.registry is None:
+            raise InvariantViolation("organization_registry_required")
+        candidates = self.registry.query(
+            run.workspace_id,
+            run.organization,
+            RegistryQuery(
+                requirements.required_department,
+                requirements.organizational_role,
+                requirements.capability_ids,
+            ),
+        )
+        return tuple(
+            a
+            for a in candidates
+            if (not run.policy.allowed_agent_ids or a.definition.id in run.policy.allowed_agent_ids)
+            and (not run.policy.allowed_roles or a.role in run.policy.allowed_roles)
+        )
+
+    def select_agent(
+        self,
+        run: OrchestrationRun,
+        requirements: AgentRequirements,
+        candidates: tuple[AgentDefinitionVersion, ...] | None = None,
+        excluded: tuple[AgentDefinitionVersion, ...] = (),
+        sources: tuple[AgentDefinitionVersion, ...] = (),
+        route_kind: RouteKind = RouteKind.DELEGATE,
+    ) -> AgentDefinitionVersion:
+        eligible = self.candidates(run, requirements)
+        # Legacy retries may use historical exact versions; organization runs are pinned.
+        if candidates is not None:
+            eligible = tuple(
+                a
+                for a in candidates
+                if (run.organization is None or a in eligible)
+                and (
+                    not run.policy.allowed_agent_ids
+                    or a.definition.id in run.policy.allowed_agent_ids
+                )
+                and (not run.policy.allowed_roles or a.role in run.policy.allowed_roles)
+            )
+        if run.source_department and run.organization and self.registry:
+            routed = []
+            for a in eligible:
+                try:
+                    self.registry.require_route(
+                        run.workspace_id,
+                        run.organization,
+                        run.source_department,
+                        a,
+                        RouteKind.DELEGATE,
+                    )
+                except InvariantViolation:
+                    continue
+                routed.append(a)
+            eligible = tuple(routed)
+        if sources and run.organization:
+            routed_candidates = []
+            for candidate in eligible:
+                try:
+                    for source in sources:
+                        self.require_organization_route(run, source, candidate, route_kind)
+                        if route_kind is RouteKind.HANDOFF:
+                            self.require_organization_route(
+                                run, source, candidate, RouteKind.DELEGATE
+                            )
+                except InvariantViolation:
+                    continue
+                routed_candidates.append(candidate)
+            eligible = tuple(routed_candidates)
+        if requirements.preferred_department and run.organization and self.registry:
+            preferred = self.registry.query(
+                run.workspace_id, run.organization, RegistryQuery(requirements.preferred_department)
+            )
+            try:
+                return self.selector.select(
+                    run.workspace_id,
+                    requirements,
+                    tuple(a for a in eligible if a in preferred),
+                    excluded,
+                )
+            except InvariantViolation as error:
+                if error.details.get("rule") != "no_eligible_agent":
+                    raise
+        return self.selector.select(run.workspace_id, requirements, eligible, excluded)
+
+    def require_organization_route(
+        self,
+        run: OrchestrationRun,
+        source: AgentDefinitionVersion,
+        target: AgentDefinitionVersion,
+        kind: RouteKind,
+    ) -> None:
+        if run.organization is not None:
+            if self.registry is None:
+                raise InvariantViolation("organization_registry_required")
+            self.registry.require_route(run.workspace_id, run.organization, source, target, kind)
+
+    def candidates_for_task(
+        self, run: OrchestrationRun, task_id: TaskId
+    ) -> tuple[AgentDefinitionVersion, ...]:
+        plan, materialization = self._current(run)
+        lineage = next((m for m in materialization.tasks if m.task_id == task_id), None)
+        if lineage is None:
+            raise InvariantViolation("handoff_task_lineage")
+        requirements = next(
+            p.requirements for p in plan.proposal.tasks if p.id == lineage.planned_task_id
+        )
+        result = []
+        for candidate in self.candidates(run, requirements):
+            try:
+                self.select_agent(run, requirements, (candidate,))
+            except InvariantViolation:
+                continue
+            result.append(candidate)
+        return tuple(result)
 
     async def start(
         self,
         workspace_id: WorkspaceId,
         goal_id: GoalId,
         policy: OrchestrationPolicy | None = None,
+        source_department: DepartmentId | None = None,
     ) -> OrchestrationRun:
         policy = policy or OrchestrationPolicy()
         with self.store.atomic():
@@ -135,6 +273,8 @@ class OrchestrationService:
                 self.strategy.strategy_version,
                 policy,
                 self.clock.now(),
+                organization=self.registry.capture(workspace_id) if self.registry else None,
+                source_department=source_department,
             )
             self.store.add_run(run)
             self._event(run, EventType.ORCHESTRATION_STARTED)
@@ -144,7 +284,7 @@ class OrchestrationService:
                 goal.version,
                 goal.objective,
                 goal.constraints,
-                self._catalog(self._latest_definitions(workspace_id, policy)),
+                self._catalog(self.candidates(run, AgentRequirements())),
                 policy,
             )
         try:
@@ -186,6 +326,8 @@ class OrchestrationService:
                     "Goal", str(goal.id), request.goal_version.value, goal.version.value
                 )
             validate_plan(request, proposal)
+            for task in proposal.tasks:
+                self.select_agent(run, task.requirements)
             prior = self.store.plans(run.workspace_id, run.id)
             plan_id = run.plan_id or self.ids.orchestration_plan_id()
             version = Version(len(prior) + 1)
@@ -250,7 +392,7 @@ class OrchestrationService:
                 goal.version,
                 goal.objective,
                 goal.constraints,
-                self._catalog(self._latest_definitions(workspace_id, run.policy)),
+                self._catalog(self.candidates(run, AgentRequirements())),
                 run.policy,
             )
         try:
@@ -394,6 +536,7 @@ class OrchestrationService:
         expected: Version,
         *,
         mode: str = "initial",
+        target_definition: AgentDefinitionVersion | None = None,
     ) -> Delegation | None:
         with self.store.atomic():
             run = self.store.run(workspace_id, run_id)
@@ -428,7 +571,7 @@ class OrchestrationService:
                 if not self.store.attempts(workspace_id, previous[-1].id):
                     return previous[-1]
                 raise InvariantViolation("task_already_delegated")
-            definitions = self._latest_definitions(workspace_id, run.policy)
+            definitions = self.candidates(run, planned.requirements)
             excluded: tuple[AgentDefinitionVersion, ...] = ()
             if mode == "retry":
                 if not previous or previous[-1].retry_ordinal >= run.policy.max_retries_per_task:
@@ -442,11 +585,12 @@ class OrchestrationService:
                     is not AgentRunStatus.FAILED
                 ):
                     raise InvariantViolation("retry_requires_failed_agent_run")
-                definitions = tuple(
-                    item
-                    for item in definitions
-                    if item.definition.id == previous[-1].agent_definition_id
-                    and item.version == previous[-1].agent_definition_version
+                definitions = (
+                    self.store.runtime.definition(
+                        workspace_id,
+                        previous[-1].agent_definition_id,
+                        previous[-1].agent_definition_version,
+                    ),
                 )
             elif mode == "redelegate":
                 if (
@@ -472,8 +616,38 @@ class OrchestrationService:
             elif mode != "initial":
                 raise InvariantViolation("delegation_mode")
             try:
-                selected = self.selector.select(
-                    workspace_id, planned.requirements, definitions, excluded
+                if target_definition is not None:
+                    if mode != "redelegate":
+                        raise InvariantViolation("target_definition_requires_redelegation")
+                    definitions = (target_definition,)
+                sources = []
+                # Dataflow from predecessor Tasks is also an organizational route.
+                for dependency in planned.dependencies:
+                    source_task = next(
+                        m.task_id for m in materialization.tasks if m.planned_task_id == dependency
+                    )
+                    source_delegations = tuple(
+                        d
+                        for d in self.store.delegations(workspace_id, run.id)
+                        if d.task_id == source_task
+                    )
+                    if source_delegations:
+                        source_assignment = source_delegations[-1]
+                        source = self.store.runtime.definition(
+                            workspace_id,
+                            source_assignment.agent_definition_id,
+                            source_assignment.agent_definition_version,
+                        )
+                        sources.append(source)
+                if mode == "redelegate" and previous:
+                    source = self.store.runtime.definition(
+                        workspace_id,
+                        previous[-1].agent_definition_id,
+                        previous[-1].agent_definition_version,
+                    )
+                    sources.append(source)
+                selected = self.select_agent(
+                    run, planned.requirements, definitions, excluded, tuple(sources)
                 )
             except InvariantViolation as error:
                 if error.details.get("rule") != "no_eligible_agent":
@@ -497,9 +671,13 @@ class OrchestrationService:
                 selected.definition.id,
                 selected.version,
                 self.clock.now(),
-                retry_ordinal=(previous[-1].retry_ordinal + 1 if mode == "retry" else 0),
+                retry_ordinal=(
+                    previous[-1].retry_ordinal + (1 if mode == "retry" else 0) if previous else 0
+                ),
                 redelegation_ordinal=(
-                    previous[-1].redelegation_ordinal + 1 if mode == "redelegate" else 0
+                    previous[-1].redelegation_ordinal + (1 if mode == "redelegate" else 0)
+                    if previous
+                    else 0
                 ),
             )
             self.store.add_delegation(delegation)
@@ -585,6 +763,12 @@ class OrchestrationService:
             ):
                 raise InvariantViolation("delegation_execution_binding_or_budget")
             task = self.store.runtime.domain.get_task(delegation.task_id)
+            plan, materialization = self._current(orchestration)
+            planned = next(p for p in plan.proposal.tasks if p.id == delegation.planned_task_id)
+            exact = self.store.runtime.definition(
+                workspace_id, delegation.agent_definition_id, delegation.agent_definition_version
+            )
+            self.select_agent(orchestration, planned.requirements, (exact,))
             if task not in self.ready_tasks(workspace_id, orchestration.id):
                 raise InvariantViolation("delegation_task_not_ready")
             if task.status is TaskStatus.PROPOSED:
@@ -622,6 +806,9 @@ class OrchestrationService:
                 delegation.agent_definition_version,
                 attempt.id,
                 context,
+                organization_version=orchestration.organization.graph.version
+                if orchestration.organization
+                else None,
             )
             self.store.add_attempt(
                 workspace_id,
@@ -631,13 +818,85 @@ class OrchestrationService:
             counted = current.evolve(at=self.clock.now(), agent_run_delta=1)
             self.store.save_run(counted, current.version)
         result = await self.runtime.drive(workspace_id, agent_run.id, agent_run.version)
+        return self._reconcile_result(workspace_id, orchestration_run_id, result)
+
+    async def resume_delegation(
+        self,
+        workspace_id: WorkspaceId,
+        orchestration_run_id: OrchestrationRunId,
+        delegation_id: DelegationId,
+        expected: Version,
+        context: SuppliedContext,
+        intent_id: ActionIntentId | None = None,
+    ) -> AgentRun:
+        """Resume a waiting child run and retain orchestration-level bookkeeping."""
+        with self.store.atomic():
+            orchestration = self.store.run(workspace_id, orchestration_run_id)
+            self._version(orchestration, expected)
+            delegation = self.store.delegation(workspace_id, delegation_id)
+            attempts = self.store.attempts(workspace_id, delegation.id)
+            if (
+                orchestration.status is not OrchestrationStatus.WAITING
+                or delegation.orchestration_run_id != orchestration.id
+                or not attempts
+                or context.task_id != delegation.task_id
+            ):
+                raise InvariantViolation("delegation_resume_binding")
+            agent_run = self.store.runtime.get_run(workspace_id, attempts[-1].agent_run_id)
+            if intent_id is not None:
+                if context != agent_run.context:
+                    raise InvariantViolation("approval_resume_cannot_change_context")
+                resumed = agent_run
+            else:
+                resumed = self.runtime.resume(
+                    workspace_id, agent_run.id, agent_run.version, context
+                )
+            running = orchestration.evolve(
+                at=self.clock.now(),
+                status=OrchestrationStatus.RUNNING,
+                escalation_reason=None,
+            )
+            self.store.save_run(running, orchestration.version)
+        try:
+            result = (
+                await self.runtime.resume_approval(
+                    workspace_id, resumed.id, intent_id, resumed.version
+                )
+                if intent_id is not None
+                else await self.runtime.drive(workspace_id, resumed.id, resumed.version)
+            )
+        except Exception:
+            if intent_id is not None:
+                with self.store.atomic():
+                    current = self.store.run(workspace_id, orchestration_run_id)
+                    if current.status is OrchestrationStatus.RUNNING:
+                        waiting = current.evolve(
+                            at=self.clock.now(),
+                            status=OrchestrationStatus.WAITING,
+                            escalation_reason="approval_revalidation_failed",
+                        )
+                        self.store.save_run(waiting, current.version)
+            raise
+        return self._reconcile_result(workspace_id, orchestration_run_id, result)
+
+    def _reconcile_result(
+        self,
+        workspace_id: WorkspaceId,
+        orchestration_run_id: OrchestrationRunId,
+        result: AgentRun,
+    ) -> AgentRun:
         with self.store.atomic():
             current = self.store.run(workspace_id, orchestration_run_id)
             failed = result.status is AgentRunStatus.FAILED
             status = current.status
             reason = None
             if result.status is AgentRunStatus.WAITING:
-                status, reason = OrchestrationStatus.WAITING, "required_context_missing"
+                status, reason = (
+                    OrchestrationStatus.WAITING,
+                    "approval_required"
+                    if result.working_state.invocation_pending
+                    else "required_context_missing",
+                )
             elif failed and current.failed_attempt_count + 1 >= current.policy.max_failed_attempts:
                 status, reason = OrchestrationStatus.WAITING, "failure_budget_exhausted"
             updated = current.evolve(
@@ -649,7 +908,12 @@ class OrchestrationService:
             self.store.save_run(updated, current.version)
             if result.status is AgentRunStatus.SUCCEEDED:
                 draft = self.aggregate(workspace_id, orchestration_run_id)
-                if draft.complete:
+                _, materialization = self._current(updated)
+                all_materialized_complete = all(
+                    self.store.runtime.domain.get_task(item.task_id).status is TaskStatus.COMPLETED
+                    for item in materialization.tasks
+                )
+                if draft.complete and all_materialized_complete:
                     goal = self.store.runtime.domain.get_goal(current.goal_id)
                     self.domain.satisfy_goal(goal.id, goal.version)
                     completed = updated.evolve(
@@ -747,6 +1011,14 @@ class OrchestrationService:
                 self.clock.now(),
                 (
                     ("strategy_id", run.strategy_id),
+                    (
+                        "organization_graph_id",
+                        str(run.organization.graph.graph_id) if run.organization else "none",
+                    ),
+                    (
+                        "organization_graph_version",
+                        str(run.organization.graph.version.value) if run.organization else "none",
+                    ),
                     ("strategy_version", run.strategy_version),
                     ("policy_version", run.policy.version),
                     ("replan_count", str(run.replan_count)),

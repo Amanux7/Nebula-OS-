@@ -1,5 +1,39 @@
 # Security and Permissions
 
+## Stage 9 consequential-action governance
+
+Approval is not permission or a policy bypass. Levels 0/1 cannot execute consequential
+writes; Level 2 requires exact approval; Level 3 needs explicit bounded policy or
+approval; Level 4 and high-risk operations remain denied. Only one offline write-style
+fixture is eligible. Unknown/foreign reviewers, modified payload/destination/actor,
+stale/cancelled work, expired/revoked/reused approval, missing grants, and changed policy
+fail closed. Organization changes invalidate pending writes rather than rewriting
+historical graph pins. Manager/lead status grants no approval authority. Trusted test
+principals are not production authentication. Claim-winning dispatch cannot promise
+remote cancellation; timeout is not proof of no write. See ADR-012.
+
+## Stage 8 organizational foundation
+
+Organization only narrows eligibility. Managers cannot inherit or impersonate a
+subordinate's Tool, Knowledge, Memory, credential, or runtime identity. Cross-department
+routes default to deny; same-department routes default to allow unless explicitly denied.
+All effective source/target membership pairs must allow a route. Existing Stage 7
+recipient reference checks remain authoritative even when organization policy allows it.
+Unknown/foreign IDs, altered snapshots, stale activation, cycles, and excessive size
+fail. Plans/messages/descriptions cannot mutate structure. Administration is trusted
+host code; production identity and emergency revocation of pinned structure remain open.
+
+## Stage 7 communication controls
+
+Communication is opt-in per immutable AgentDefinitionVersion and limited to exact
+recipient roles, one workspace, one OrchestrationRun, active delegated participants,
+allowed kinds/references, and explicit budgets. The runtime rejects impersonation,
+recipient spoofing, cross-workspace IDs, message flooding, stale responses, terminal
+recipients, and handoff loops. Every referenced ToolReceipt, EvidencePack,
+MemoryContextPack, or TaskResultReference is independently reauthorized for the
+recipient. Sender authority never transfers. Message text cannot grant tools, become
+Knowledge, auto-promote to Memory, or widen autonomy/policy.
+
 ## Stage 6 orchestration controls
 
 Plan proposals and delegated outputs are untrusted data. Deterministic validators—not
@@ -70,8 +104,9 @@ capabilities. Stage 3 implements the narrow tool boundary in
 [ADR-006](ADR/ADR-006-tool-runtime.md): exact immutable AgentDefinitionVersion grants,
 workspace-scoped tool registry, action allowlist, read-only risk enforcement,
 schema/byte/time/call limits, and post-I/O version/enablement checks.
-No authenticated API, secret broker, connection/OAuth system, human approval engine,
-transport sandbox, or production telemetry redaction service exists yet.
+Stage 9 adds the narrow offline approval contract described above. No authenticated
+API, secret broker, connection/OAuth system, transport sandbox, or production
+telemetry redaction service exists yet.
 
 Stage 3 ToolRisk uses `read_only`, `internal_write`, `external_write`, and `high_risk`;
 only `read_only` executes. This is a coarse initial classification, not an alternative

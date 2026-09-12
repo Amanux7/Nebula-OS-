@@ -1,5 +1,34 @@
 # Data Architecture
 
+## Stage 9 consequential-action governance
+
+RuntimeStore now retains exact immutable intents and captured policies, requests,
+append-only decisions, cancellation, reservation, and consumption metadata. Intent and
+request events, decision events, and dispatch reservation/ToolInvocation claims each
+share the existing rollback boundary. Payload fingerprints and actor/configuration
+references preserve audit lineage. Explicit protected exports contain exact payloads;
+Events omit message content. Local state does not survive process loss and cannot
+establish distributed exactly-once effects. See ADR-012 for unknown-outcome handling.
+
+## Stage 8 organizational foundation
+
+OrganizationGraph separates identity/revision/active pointer from immutable graph
+versions. Whole-version publication and activation include audit Events in the shared
+runtime/domain rollback boundary. OrchestrationRun pins an immutable OrganizationSnapshot.
+Activation of v2 never replaces an existing v1 pin; effective dates are checked at use
+within the pinned version. A v2 revocation affects v2 discovery, not v1 pins. Explicit
+serialization includes IDs, versions, structure, lifecycle, dates, rules, and bounds.
+No graph database, durable recovery, or production retention is implemented.
+
+## Implemented Stage 7 communication records
+
+The in-memory adapter stores bounded MessageThreads, immutable AgentMessages, evolving
+delivery metadata, HandoffRequests, and audit Events. Exact participant/configuration,
+Task/Delegation, correlation, reference, policy, schema, and handoff lineage preserve
+historical interpretation. Message creation/delivery and handoff acceptance/redelegation
+share atomic rollback with orchestration/runtime state. There is no durable queue,
+broker, distributed ordering, or production retention/deletion implementation.
+
 ## Implemented Stage 6 orchestration records
 
 The in-memory Stage 6 adapter stores canonical OrchestrationRuns, immutable PlanVersions,

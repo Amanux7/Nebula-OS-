@@ -5,6 +5,7 @@ from typing import Protocol
 
 from agent_company_os.domain.agent import AgentRun, AgentRunId, Fact
 from agent_company_os.domain.decisions import Action
+from agent_company_os.domain.governance import ActionIntentId
 from agent_company_os.domain.ids import Version, WorkspaceId
 from agent_company_os.domain.tools import ToolGrant, ToolId, ToolInput, ToolInvocation, ToolVersion
 
@@ -28,6 +29,15 @@ class ToolRegistryPort(Protocol):
 
 
 class ToolRuntimePort(Protocol):
+    @property
+    def governance_enabled(self) -> bool: ...
+    async def resume_intent(
+        self,
+        workspace_id: WorkspaceId,
+        run_id: AgentRunId,
+        intent_id: ActionIntentId,
+        expected_version: Version,
+    ) -> AgentRun: ...
     async def invoke(
         self,
         workspace_id: WorkspaceId,

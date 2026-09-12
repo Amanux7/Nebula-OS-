@@ -89,6 +89,11 @@ class InMemoryOrchestrationStore:
                 )
             if run.version != previous.version.next():
                 raise InvariantViolation("orchestration_run_version_increment")
+            if (
+                run.organization != previous.organization
+                or run.source_department != previous.source_department
+            ):
+                raise InvariantViolation("organization_pin_immutable")
             self._runs[run.id] = run
 
     def add_plan(self, plan: PlanVersion) -> None:

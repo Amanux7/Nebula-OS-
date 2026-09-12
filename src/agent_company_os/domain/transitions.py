@@ -11,6 +11,10 @@ from agent_company_os.domain.validation import clean_required_text, require_utc
 
 
 class SubjectType(StrEnum):
+    ORGANIZATION_GRAPH = "OrganizationGraph"
+    AGENT_MESSAGE = "agent_message"
+    MESSAGE_THREAD = "message_thread"
+    HANDOFF = "handoff"
     ORCHESTRATION_RUN = "orchestration_run"
     ORCHESTRATION_PLAN = "orchestration_plan"
     DELEGATION = "delegation"

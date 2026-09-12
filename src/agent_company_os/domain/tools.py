@@ -35,11 +35,13 @@ class ToolRisk(StrEnum):
 
 
 class ExecutorKind(StrEnum):
+    SEND_FIXTURE_MESSAGE = "send_fixture_message"
     COMPANY_LOOKUP = "company_lookup"
     SOURCE_LOOKUP = "source_lookup"
 
 
 class ToolError(StrEnum):
+    REJECTED = "rejected"
     VALIDATION_ERROR = "validation_error"
     UNAUTHORIZED = "unauthorized"
     NOT_FOUND = "not_found"
@@ -134,7 +136,13 @@ class SourceLookupInput:
     keys: tuple[str, ...]
 
 
-type ToolInput = CompanyLookupInput | SourceLookupInput
+@dataclass(frozen=True)
+class FixtureMessageInput:
+    destination: str
+    message: str
+
+
+type ToolInput = CompanyLookupInput | SourceLookupInput | FixtureMessageInput
 
 
 @dataclass(frozen=True)
@@ -225,7 +233,14 @@ class ToolReceipt:
             or type(self.output_bytes) is not int
             or not 0 < self.input_bytes <= self.invocation.tool_version.max_input_bytes
             or not 0 <= self.output_bytes <= self.invocation.tool_version.max_output_bytes
-            or self.remote_outcome != ("observed" if self.output is not None else "unknown")
+            or self.remote_outcome
+            != (
+                "observed"
+                if self.output is not None
+                else "observed_failure"
+                if self.invocation.error_code is ToolError.REJECTED
+                else "unknown"
+            )
         ):
             raise InvariantViolation("receipt_metadata_contract")
 

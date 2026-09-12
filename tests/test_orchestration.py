@@ -451,6 +451,117 @@ def test_ab_ac_end_to_end_goal_completion_and_lineage(service, clock) -> None:
     )
 
 
+def test_stage6_review_resume_reconciles_waiting_orchestration(service, clock) -> None:
+    h = Harness(service, clock)
+    h.materialize()
+    task = h.service.ready_tasks(h.workspace.id, h.run.id)[0]
+    delegation = h.delegate(task)
+    assert delegation is not None
+    context = h.successful_context(task)
+    h.agent_runtime.model = FakeModel(
+        (decision("request_more_context", {"missing_fields": ["fact"]}),)
+    )
+    waiting = h.execute(delegation, context)
+    assert waiting.status is AgentRunStatus.WAITING
+    orchestration = h.current()
+    assert orchestration.status is OrchestrationStatus.WAITING
+    h.agent_runtime.model = FakeModel((complete(context.facts[0]),))
+    resumed = asyncio.run(
+        h.service.resume_delegation(
+            h.workspace.id,
+            orchestration.id,
+            delegation.id,
+            orchestration.version,
+            context,
+        )
+    )
+    assert resumed.status is AgentRunStatus.SUCCEEDED
+    assert h.current().status is OrchestrationStatus.RUNNING
+
+
+def test_stage6_review_optional_tasks_cannot_complete_goal_early(service, clock) -> None:
+    h = Harness(service, clock, capabilities=("research", "research"), agents=2)
+    tasks = (
+        PlannedTask(
+            "required", "Required", ("done",), requirements=AgentRequirements(("research",))
+        ),
+        PlannedTask(
+            "optional",
+            "Optional",
+            ("done",),
+            requirements=AgentRequirements(("research",)),
+            required=False,
+        ),
+    )
+    scoped = FakeOrchestrationStrategy((proposal(h.workspace.id, h.goal.id, tasks),))
+    h.service.strategy = scoped
+    h.run = asyncio.run(h.service.start(h.workspace.id, h.goal.id))
+    h.materialize()
+    required_task = next(
+        task for task in h.service.ready_tasks(h.workspace.id, h.run.id) if task.title == "Required"
+    )
+    delegation = h.delegate(required_task)
+    assert delegation is not None
+    h.execute(delegation, h.successful_context(required_task))
+    assert service.store.get_goal(h.goal.id).status is GoalStatus.ACTIVE
+    assert h.current().status is OrchestrationStatus.RUNNING
+    optional_task = next(
+        task for task in h.service.ready_tasks(h.workspace.id, h.run.id) if task.title == "Optional"
+    )
+    delegation = h.delegate(optional_task)
+    assert delegation is not None
+    h.execute(delegation, h.successful_context(optional_task))
+    assert service.store.get_goal(h.goal.id).status is GoalStatus.SATISFIED
+
+
+def test_stage6_review_retry_uses_pinned_definition_version(service, clock) -> None:
+    h = Harness(service, clock)
+    h.materialize()
+    task = h.service.ready_tasks(h.workspace.id, h.run.id)[0]
+    first = h.delegate(task)
+    assert first is not None
+    context = h.successful_context(task)
+    h.agent_runtime.model = FakeModel(("bad",))
+    h.execute(first, context)
+    pinned = h.runtime_store.definition(
+        h.workspace.id, first.agent_definition_id, first.agent_definition_version
+    )
+    h.runtime_store.publish(replace(pinned, version=pinned.version.next(), instructions="new"))
+    retry = h.delegate(service.store.get_task(task.id), mode="retry")
+    assert retry is not None
+    assert retry.agent_definition_version == first.agent_definition_version
+
+
+def test_stage6_review_recovery_counters_do_not_reset(service, clock) -> None:
+    h = Harness(
+        service,
+        clock,
+        capabilities=("research", "research", "analysis", "writing"),
+        agents=4,
+        policy=OrchestrationPolicy(max_failed_attempts=10),
+    )
+    h.materialize()
+    task = h.service.ready_tasks(h.workspace.id, h.run.id)[0]
+    first = h.delegate(task)
+    assert first is not None
+    context = h.successful_context(service.store.get_task(task.id))
+    h.agent_runtime.model = FakeModel(("bad",))
+    h.execute(first, context)
+    retry = h.delegate(service.store.get_task(task.id), mode="retry")
+    assert retry is not None
+    context = h.successful_context(service.store.get_task(task.id))
+    h.agent_runtime.model = FakeModel(("bad",))
+    h.execute(retry, context)
+    redelegated = h.delegate(service.store.get_task(task.id), mode="redelegate")
+    assert redelegated is not None
+    assert (redelegated.retry_ordinal, redelegated.redelegation_ordinal) == (1, 1)
+    context = h.successful_context(service.store.get_task(task.id))
+    h.agent_runtime.model = FakeModel(("bad",))
+    h.execute(redelegated, context)
+    with pytest.raises(InvariantViolation, match="retry_limit"):
+        h.delegate(service.store.get_task(task.id), mode="retry")
+
+
 @pytest.mark.parametrize("case", CASES)
 def test_orchestration_evaluation_fixture_is_versioned(case) -> None:
     assert isinstance(case, str) and case

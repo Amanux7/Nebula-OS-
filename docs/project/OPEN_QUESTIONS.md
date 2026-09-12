@@ -1,6 +1,48 @@
 # Open Questions
 
+## Stage 9 consequential-action governance
+
+ADR-012 resolves exact intent/digest binding, Levels 0–3 policy, explicit local reviewer
+allowlists, single-use reservation/consumption, lazy expiry, current-policy revalidation,
+organization-aware write invalidation, waiting/resume, and fixture-only execution.
+Approval is not a grant; manager is not approver. High-risk and Level 4 writes stay denied.
+
+Still open: authenticated reviewer/admin identity, separation of duties/multi-party
+review, human preview comprehension, durable claim recovery/reconciliation, real
+connector idempotency and compensation, retention/redaction, production rate limits,
+and safe emergency revocation across distributed systems. Recommend reliability and
+audit-query foundations for Stage 10 before production writes or approval/graph UI.
+
+## Stage 8 organizational foundation
+
+ADR-011 resolves flat department membership, one reporting parent, cycle/depth limits,
+one active lead, immutable whole-graph versions, atomic activation, exact registry
+references, and pinned history. Organization narrows existing authorization.
+
+Still open: authenticated administrators; emergency revocation for pinned structure;
+department-context routing for matrix membership; overlapping lead windows; durable
+transactions/recovery; privacy, redaction, and revision retention; UI/editor and analytics;
+calibrated routing quality. No self-promotion, dynamic hiring/firing, LDAP/SCIM, or
+autonomous restructuring is implemented.
+
 These decisions are intentionally unresolved. “Target stage” indicates when evidence is expected, not a deadline to decide prematurely.
+
+## Stage 7 decision updates
+
+- OQ-008: ADR-010 selects bounded point-to-point AgentMessages, exact correlation,
+  immutable participant/configuration provenance, and explicit orchestration-mediated
+  HandoffRequests. Broadcast, pub/sub, inbox polling, and shared blackboards are absent.
+- OQ-029/030: Stage 7 adds typed communication/handoff records and minimal audit Events;
+  it does not reintroduce ExecutionStep or event sourcing.
+- OQ-023: direct in-process delivery proves semantics. No queue, broker, distributed
+  transport, retry protocol, or process-loss recovery technology is selected.
+- OQ-031: substantial peer work escalates to a Handoff and canonical redelegation;
+  small bounded clarification remains a message. Partial Goal success is still open.
+
+New questions: which evaluated workflows justify model-proposed communication actions;
+what delivery durability/ordering is required; how privacy deletion and sensitive
+redaction apply; whether reference transformation is useful when full forwarding is
+denied; and how Stage 8 departments constrain discovery and role grants.
 
 ## Stage 6 decision updates
 

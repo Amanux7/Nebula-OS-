@@ -1,5 +1,35 @@
 # Observability Strategy
 
+## Stage 9 consequential-action governance
+
+Stage 9 Events identify intent creation, approval request/grant/rejection/revocation/
+expiry/consumption, intent cancellation, and execution authorization/denial. IDs,
+fingerprints, risk and policy versions correlate through the existing Action, AgentRun,
+ToolInvocation and ToolReceipt chain. governance_metrics projects counts, approval/
+rejection/expiry/revocation rates, mean time-to-approval, dispatch-after-approval rate,
+revalidation rejection, and approval-resume replay prevention from supplied scoped
+records. No raw message text enters Event metadata. Protected previews are separate.
+This is an offline projection, not production telemetry, retention, or a dashboard.
+
+## Stage 8 organizational foundation
+
+Graph version creation and activation Events expose graph/version and department,
+membership, and capability counts. Orchestration Events include the graph pin. Snapshot
+exports preserve reporting, lifecycle, effective windows, rules, and bounds. Structured
+invariant codes explain rejections; directory result lengths expose candidate counts.
+No immutable Event is emitted per query. Query counters, dashboards, telemetry exporters,
+authenticated audit views, and retention remain deferred.
+
+## Stage 7 communication signals
+
+Events record message creation/delivery/rejection/consumption, handoff
+request/accept/reject/complete/failure, and lazy timeout. Correlation includes workspace,
+Goal, OrchestrationRun, thread, message, correlation/reply, sender/recipient AgentRuns
+and definition versions, Tasks, Delegations, handoff parent/depth, resulting Delegation,
+and TaskResultReference. Candidate metrics are message/request/response/handoff counts,
+success/rejection/timeout counts, average depth, and messages per Goal/Task. Raw sensitive
+payload content is not required in Events or logs.
+
 ## Stage 6 orchestration signals
 
 Audit Events now identify orchestration start, plan proposal/rejection/acceptance and

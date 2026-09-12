@@ -22,6 +22,7 @@ from agent_company_os.domain.errors import (
     WorkspaceMismatch,
 )
 from agent_company_os.domain.events import Event
+from agent_company_os.domain.governance import ActionIntentId, ApprovalPolicy, GovernedAction
 from agent_company_os.domain.ids import TaskAttemptId, Version, WorkspaceId
 from agent_company_os.domain.tools import (
     ToolInvocation,
@@ -44,6 +45,8 @@ class InMemoryRuntimeStore:
         self._transitions: list[StateTransition] = []
         self._tool_invocations: dict[ToolInvocationId, ToolInvocation] = {}
         self._tool_receipts: dict[ToolReceiptId, ToolReceipt] = {}
+        self._approval_policies: dict[WorkspaceId, ApprovalPolicy] = {}
+        self._governed: dict[ActionIntentId, GovernedAction] = {}
 
     @contextmanager
     def atomic(self) -> Iterator[None]:
@@ -57,6 +60,8 @@ class InMemoryRuntimeStore:
                 self._transitions.copy(),
                 self._tool_invocations.copy(),
                 self._tool_receipts.copy(),
+                self._approval_policies.copy(),
+                self._governed.copy(),
             )
             try:
                 yield
@@ -70,8 +75,80 @@ class InMemoryRuntimeStore:
                     self._transitions,
                     self._tool_invocations,
                     self._tool_receipts,
+                    self._approval_policies,
+                    self._governed,
                 ) = snapshot
                 raise
+
+    def approval_policy(self, workspace_id: WorkspaceId) -> ApprovalPolicy | None:
+        self.domain.get_workspace(workspace_id)
+        return self._approval_policies.get(workspace_id)
+
+    def publish_approval_policy(self, policy: ApprovalPolicy) -> None:
+        with self.atomic():
+            old = self.approval_policy(policy.workspace_id)
+            if policy.version != (old.version.next() if old else Version(1)):
+                raise InvariantViolation("approval_policy_version_sequence")
+            self._approval_policies[policy.workspace_id] = policy
+
+    def governed_actions(self, workspace_id: WorkspaceId) -> tuple[GovernedAction, ...]:
+        self.domain.get_workspace(workspace_id)
+        return tuple(g for g in self._governed.values() if g.intent.workspace_id == workspace_id)
+
+    def governed_action(
+        self, workspace_id: WorkspaceId, intent_id: ActionIntentId
+    ) -> GovernedAction:
+        try:
+            record = self._governed[intent_id]
+        except KeyError as error:
+            raise EntityNotFound("ActionIntent", str(intent_id)) from error
+        self._scope(workspace_id, record.intent.workspace_id)
+        return record
+
+    def save_governed_action(self, record: GovernedAction, expected: Version | None) -> None:
+        with self.atomic():
+            intent = record.intent
+            run = self.get_run(intent.workspace_id, intent.run_id)
+            action = self.action(intent.workspace_id, intent.action_id)
+            if (
+                action.run_id != run.id
+                or intent.goal_id != run.goal_id
+                or intent.task_id != run.task_id
+                or intent.execution_id != run.execution_id
+            ):
+                raise InvariantViolation("governed_action_lineage")
+            old = self._governed.get(intent.id)
+            if old is None:
+                if (
+                    expected is not None
+                    or record.version != Version(1)
+                    or record.decisions
+                    or record.cancelled
+                    or record.invocation_id is not None
+                    or record.consumed
+                    or len(self.governed_actions(intent.workspace_id)) >= 200
+                    or any(g.intent.action_id == intent.action_id for g in self._governed.values())
+                ):
+                    raise InvariantViolation("governed_action_initial_state")
+            else:
+                if old.version != expected:
+                    raise InvariantViolation("governed_action_version_conflict")
+                if (
+                    intent != old.intent
+                    or record.request != old.request
+                    or record.version != old.version.next()
+                    or record.decisions[: len(old.decisions)] != old.decisions
+                    or len(record.decisions) > len(old.decisions) + 1
+                    or len(record.decisions) > 2
+                    or old.cancelled
+                    and not record.cancelled
+                    or old.invocation_id is not None
+                    and record.invocation_id != old.invocation_id
+                    or old.consumed
+                    and not record.consumed
+                ):
+                    raise InvariantViolation("governed_action_history_immutable")
+            self._governed[intent.id] = record
 
     def publish(self, definition: AgentDefinitionVersion) -> None:
         with self.atomic():

@@ -20,6 +20,7 @@ class ModelFailure(Exception):
 
     def __init__(self, code: str) -> None:
         if code not in {
+            "consequential_action_unresolved",
             "schema_violation",
             "unsupported_schema_version",
             "empty_response",

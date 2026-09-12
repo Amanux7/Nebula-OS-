@@ -1,5 +1,33 @@
 # Agent Runtime Architecture
 
+## Stage 9 consequential-action governance
+
+The strict call_tool Action can propose send_fixture_message. Governance-enabled runs
+pin single-agent-governance-v1 / consequential-actions-v1. Exact approval waits preserve
+AgentRun/TaskAttempt/Execution identity, deadline, iteration, and Tool budgets; ordinary
+context resume cannot clear pending approval. resume_approval revalidates and invokes
+the same Action through Tool Runtime before continuing the loop. Orchestration reports
+approval_required and reconciles the same Delegation. Unresolved consequential outcomes
+cannot be masked by completing from unrelated supplied facts. No live model was added.
+
+## Stage 8 organizational foundation
+
+Organization-aware orchestration pins graph and registered definition versions.
+Registry discovery feeds AgentSelector; required departments filter and preferences may
+fall back. Eligibility, including membership expiry, is checked before AgentRun start.
+The selected exact AgentDefinitionVersion retains its own Tool, Knowledge, Memory,
+communication, and autonomy grants. A lead is an escalation destination, not a superuser.
+There is no organizational mutation Action or dynamic agent creation.
+
+## Stage 7 communication context
+
+The runtime may receive a bounded `AgentMessageContext` through a dedicated port. The
+ContextAssembler places it in `AgentModelRequest.agent_messages`, separate from supplied
+facts, Tool Observations, Knowledge EvidencePacks, MemoryContextPacks, and canonical Task
+results. Each entry is labeled `untrusted_agent_message`. Stage 7 adds no model message
+actions; host commands exercise the protocol. A Handoff ends one attempt safely and the
+existing runtime executes the orchestration-created redelegation.
+
 ## Stage 6 orchestration integration
 
 Orchestration calls the existing `AgentRuntimeService`; it does not replace or duplicate

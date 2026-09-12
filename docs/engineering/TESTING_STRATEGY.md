@@ -1,5 +1,35 @@
 # Testing Strategy
 
+## Stage 9 consequential-action governance
+
+tests/test_governance.py adds 58 offline cases covering Levels 0–3, disabled Level 4,
+canonical risk, exact payload/destination/tool/actor binding, explicit reviewers,
+expiry/revocation/rejection, current-policy checks, independent Tool grants, stale and
+cancelled work, rollback, duplicate dispatch, cancellation-after-write, outcome certainty,
+protected serialization, and audit metadata. A real Research → Product → Marketing
+orchestration waits for exact approval, delivers once, and satisfies the Goal; rejection
+and changed organization versions leave it safely waiting. The full gate is recorded
+in the Stage 9 report. No live provider or production side effect is needed.
+
+## Stage 8 organizational foundation
+
+The Stage 8 suite adds 55 deterministic cases spanning A–AM-equivalent graph validation,
+discovery, versioning, rollback, workspace isolation, expiry, policy, spoofing, and
+injection scenarios. Cross-stage tests exercise graph → registry → selector → AgentRun,
+message reference reauthorization, canonical handoffs, v1/v2 pinning, and an actual lead
+AgentRun denied subordinate Tool/Knowledge/Memory access. Tests live in
+tests/test_organization.py and use the existing offline quality gate. Exact evidence
+is recorded in [Stage 8 report](../STAGE_8_REPORT.md).
+
+## Stage 7 communication gate
+
+The offline Stage 7 suite covers A–AD message, correlation, handoff, rejection,
+recipient/scope/schema/budget/depth/idempotency/reference/cancellation/timeout/rollback/
+history/result/task-boundary scenarios. It includes deterministic request/response and
+canonical handoff demos plus prompt, authority, Knowledge, Memory, and result-laundering
+cases. Four regression tests cover Stage 6 resume reconciliation, optional completion,
+pinned retry versions, and independent recovery counters.
+
 ## Stage 6 orchestration gate
 
 The deterministic Stage 6 suite covers valid linear and parallel plans, cycles, unknown

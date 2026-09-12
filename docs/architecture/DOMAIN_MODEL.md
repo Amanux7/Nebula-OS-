@@ -1,5 +1,43 @@
 # Domain Model
 
+## Stage 9 consequential-action governance
+
+Stage 9 adds immutable ActionIntent, ApprovalPolicy, ApprovalRequest, append-only
+ApprovalDecision, typed ReviewerPrincipal, and a versioned GovernedAction lifecycle
+record. ActionIntent binds the canonical Action, actor and parent lineage, exact
+ToolVersion, risk, normalized destination/payload, policy snapshot, SHA-256 digest,
+and expiry. Approval is one-use consent, never a Tool grant. The existing AgentRun
+and Execution waiting states represent pending approval; no new Task state machine
+or generic ExecutionStep is introduced. See ADR-012 for exact semantics and bounds.
+
+## Stage 8 organizational foundation
+
+OrganizationGraph is the stable structural identity of one Workspace. Immutable
+OrganizationGraphVersions contain bounded Departments, OrgRoles, CapabilityDefinitions,
+exact RegisteredAgent references, DepartmentMemberships, ReportingRelationships, and
+OrganizationPolicy. OrganizationSnapshot pins the exact graph on OrchestrationRun.
+
+Departments/capabilities are active or disabled. Memberships are active or revoked,
+explicitly discoverable, and optionally effective within UTC time bounds. Reporting has
+one parent, no self/cyclic edges, and bounded depth. One active lead per department is
+enforced. Membership is not a permission grant. Graph changes append versions; existing
+history is retained. See ADR-011 for limits and policy semantics.
+
+## Implemented Stage 7 communication model
+
+`AgentMessage` is the immutable point-to-point envelope for one OrchestrationRun. It
+binds exact sender/recipient AgentRuns and AgentDefinitionVersions, source/recipient
+Tasks and Delegations, a bounded typed payload, references, correlation, policy/schema
+versions, and lifecycle metadata. `MessageThread` is a bounded correlation group, not
+a channel or inbox. Delivery is distinct from consumption.
+
+`HandoffRequest` records a participant request for substantial-work transfer, exact
+source lineage, target requirements, bounded parent/depth, deterministic resolution,
+resulting Delegation, and final TaskResultReference. A Handoff cannot mutate Task state
+or assign work directly; orchestration creates the canonical redelegation. Messages are
+not Tasks, Knowledge, Memory, or permission grants. All reference kinds are reauthorized
+for the recipient. Historical participant versions and payload snapshots are immutable.
+
 ## Implemented Stage 6 orchestration model
 
 Stage 6 adds coordination records without changing the canonical Goal, Task,

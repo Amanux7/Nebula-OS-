@@ -6,6 +6,7 @@ from agent_company_os.domain.agent import Fact
 from agent_company_os.domain.tools import (
     CompanyLookupInput,
     ExecutorKind,
+    FixtureMessageInput,
     SourceLookupInput,
     ToolError,
     ToolFailure,
@@ -53,6 +54,11 @@ def _text(value: object, maximum: int, code: ToolError) -> str:
 def validate_input(raw: str, version: ToolVersion) -> ToolInput:
     code = ToolError.VALIDATION_ERROR
     value = bounded_json(raw, version.max_input_bytes, code)
+    if version.executor_kind is ExecutorKind.SEND_FIXTURE_MESSAGE:
+        item = _object(value, {"destination", "message"}, code)
+        return FixtureMessageInput(
+            _text(item["destination"], 128, code), _text(item["message"], 512, code)
+        )
     if version.executor_kind is ExecutorKind.COMPANY_LOOKUP:
         item = _object(value, {"company_name"}, code)
         return CompanyLookupInput(_text(item["company_name"], 128, code))
@@ -70,6 +76,8 @@ def input_json(value: ToolInput) -> str:
     fields: dict[str, object]
     if isinstance(value, CompanyLookupInput):
         fields = {"company_name": value.company_name}
+    elif isinstance(value, FixtureMessageInput):
+        fields = {"destination": value.destination, "message": value.message}
     else:
         fields = {"source_id": value.source_id, "keys": list(value.keys)}
     return json.dumps(fields, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
@@ -93,11 +101,17 @@ def validate_output(raw: str, version: ToolVersion, request: ToolInput) -> ToolO
         raise ToolFailure(code)
     subject = _text(item["subject"], 128, code)
     expected = (
-        request.company_name if isinstance(request, CompanyLookupInput) else request.source_id
+        request.company_name
+        if isinstance(request, CompanyLookupInput)
+        else request.destination
+        if isinstance(request, FixtureMessageInput)
+        else request.source_id
     )
     if subject != expected:
         raise ToolFailure(code)
     rows = item["facts"]
+    if isinstance(request, FixtureMessageInput) and rows != []:
+        raise ToolFailure(code)  # Delivery receipts cannot invent factual grounding.
     if not isinstance(rows, list) or len(rows) > 10:
         raise ToolFailure(code)
     facts = []
