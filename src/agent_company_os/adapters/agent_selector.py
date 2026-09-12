@@ -26,6 +26,7 @@ class DeterministicAgentSelector:
                 or not item.enabled
                 or (item.definition.id, item.version) in excluded_keys
                 or not set(requirements.capabilities) <= set(item.capabilities)
+                or not set(requirements.capability_ids) <= set(item.capability_ids)
                 or not set(requirements.tool_ids) <= {grant.tool_id for grant in item.allowed_tools}
                 or not set(requirements.knowledge_source_ids)
                 <= set(item.knowledge_scope.source_ids)

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "cases": [
+    "information_message",
+    "request_response",
+    "handoff_success",
+    "handoff_reject",
+    "handoff_depth_limit",
+    "duplicate_message",
+    "cross_workspace_message",
+    "unauthorized_recipient",
+    "reference_scope_leak",
+    "message_injection",
+    "late_response",
+    "cancelled_recipient",
+    "communication_not_needed",
+    "message_vs_task"
+  ]
+}

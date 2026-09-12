@@ -118,39 +118,48 @@ Stages are capability gates, not calendar estimates. A later stage begins only w
 
 ## Stage 7 — Multi-agent communication
 
-- **Objective:** make agent collaboration typed, scoped, and inspectable.
-- **Build:** message/handoff envelope, context/reference transfer, recipient validation, correlation and loop prevention, shared-artifact conventions.
-- **Do not build:** unbounded group chat, invisible shared context, peer authority escalation.
-- **Tests required:** unauthorized context transfer, duplicate/out-of-order messages, cyclic handoffs, version mismatch, delivery failure.
-- **Completion criteria:** agents collaborate without shared process memory and every handoff is attributable.
-- **Questions answered:** message persistence, delivery semantics, conversation versus task linkage.
+- **Implemented status (2026-09-04):** deterministic Stage 7 gate passed. See
+  [Stage 7 report](../STAGE_7_REPORT.md) and
+  [ADR-010](../architecture/ADR/ADR-010-multi-agent-communication-and-handoffs.md).
+- **Objective:** make internal participant collaboration typed, scoped, bounded, and
+  inspectable without creating chat infrastructure or transferring authority.
+- **Built:** immutable AgentMessages, typed payloads/references, bounded MessageThreads,
+  opt-in exact-role CommunicationPolicy, idempotent in-process delivery, request/response
+  correlation, separate message context, lazy timeouts, recipient reference
+  reauthorization, HandoffRequests, existing-selector resolution, orchestration-created
+  redelegation, loop/depth guards, exact result lineage, Events, serialization, and
+  atomic in-memory storage.
+- **Not built:** model message actions, broadcast/pub-sub, inbox polling, shared
+  blackboard, durable/distributed transport, external messaging, MCP, or UI.
+- **Tests passed:** A–AD deterministic and adversarial communication/handoff cases plus
+  four Stage 6 GitHub-review regressions.
+- **Questions answered:** messages are point-to-point work records, delivery is local and
+  distinct from consumption, substantial work requires handoff/orchestration, and
+  sender access never substitutes for recipient authorization.
 
 ## Stage 8 — Departments and agent registry
 
-- **Objective:** organize proven capabilities without hard-coded company structure.
-- **Build:** Department grouping, discoverable registry, version activation/deprecation, capability metadata, policy defaults, compatibility validation.
-- **Do not build:** arbitrary agent quantity, marketplace economics, graph as truth.
-- **Tests required:** activation/version resolution, policy inheritance/narrowing, archive behavior, capability selection.
-- **Completion criteria:** operators can safely discover and govern active definitions and departments.
-- **Questions answered:** hierarchy constraints, lifecycle UX, template portability.
+- **Implemented status (2026-09-11):** deterministic gate passed: 386 tests, including 55 organizational cases. See [Stage 8 report](../STAGE_8_REPORT.md) and ADR-011.
+- **Built:** immutable OrganizationGraphVersions, atomic activation, Department/OrgRole/CapabilityDefinition, exact registry references, effective/revoked memberships, bounded acyclic reporting, lead discovery, department policy intersection, pinned orchestration, and communication/handoff integration.
+- **Not built:** permission inheritance, graph UI/database, dynamic agent creation, autonomous restructuring, LDAP/SCIM, distributed registry, or production identity.
+- **Tests passed:** creation/filtering/history/activation/rollback/bounds/expiry/scope, policy denial, spoofing/injection, full orchestration, handoff, and manager Tool/Knowledge/Memory rejection.
+- **Questions answered:** whole-version structural ownership, discovery versus selection, required versus preferred routing, conservative multi-membership policy, and graph pinning.
 
 ## Stage 9 — Human approval and autonomy policies
 
-- **Objective:** productionize human control and narrowly bounded execution.
-- **Build:** Approval Request lifecycle, payload binding, eligible approvers, expiry, revalidation, autonomy levels, policy simulator, kill controls.
-- **Do not build:** broad Level 4 autonomy, trust-by-reputation, approval that changes only UI state.
-- **Tests required:** tampering/replay, stale policy/data, revocation race, approver separation, kill latency, risk-class matrix.
-- **Completion criteria:** all consequential reference actions are enforced end to end with auditable decisions.
-- **Questions answered:** policy engine complexity, approval granularity, multi-party needs, safe Level 3 candidates.
+- **Verified scope (2026-09-11):** offline deterministic governance, not production authentication or integrations. Full gate: 444 tests, including 58 Stage 9 cases; see [Stage 9 report](../STAGE_9_REPORT.md) and ADR-012.
+- **Built:** exact immutable ActionIntents, canonical risk, Levels 0–3 policy, explicit reviewer principals, digest-bound requests/decisions, expiry/revocation/cancellation, atomic one-use claims, current-state revalidation, protected previews/audit projection, and one send_fixture_message capability.
+- **Integrated:** existing Tool Runtime, same-run approval wait/resume, orchestration reconciliation, original-actor handoff binding, and organization-change rejection.
+- **Not built:** production writes, unrestricted Level 4, blanket approvals, production authentication, approval UI, distributed approvals, or new infrastructure.
+- **Evidence:** payload/destination/actor/policy/scope checks, replay/race/rollback/uncertainty tests, independent Tool authority, and Research → Product → Marketing approval/rejection scenarios.
 
-## Stage 10 — Execution graph and observability UI
+## Stage 10 — Reliability, recovery, and audit-query foundations (recommended)
 
-- **Objective:** make real runtime state understandable and operable.
-- **Build:** trace query model, timeline/graph projections, logs/metrics/traces correlation, failure drill-down, artifact and approval views, redaction.
-- **Do not build:** hard-coded demo graph, chain-of-thought viewer, canonical edits in visualization.
-- **Tests required:** projection consistency, redaction, accessibility, large trace performance, incomplete telemetry.
-- **Completion criteria:** users diagnose all seeded incidents and views match canonical records.
-- **Questions answered:** projection/store needs, retention, operator versus end-user views.
+- **Reason for recommendation:** Stage 9 proves local authorization but in-memory claims and receipts do not survive process loss. Recovery and accurate audit queries should precede real connectors and consequential-action UI.
+- **Proposed work:** requirement-backed durability ADR, dispatch/receipt recovery and reconciliation contracts, safe handling of unresolved claims, workspace-scoped audit queries, retention/redaction requirements, and crash/replay/fault evidence.
+- **Do not infer authorization:** no storage product, queue, distributed service, real integration, graph UI, or approval UI is selected or implemented by this recommendation.
+- **Former UI milestone:** execution graphs, approval views, accessibility, and timeline projections remain useful later work over proven canonical records.
+- **Status:** not started; requires a separate Stage 10 request.
 
 ## Stage 11 — Evaluations and reliability hardening
 
@@ -181,8 +190,7 @@ Stages are capability gates, not calendar estimates. A later stage begins only w
 
 ## Immediate next milestone
 
-Stage 6 provides bounded replaceable planning, deterministic delegation, and exact
-cross-task result lineage without weakening domain or permission authority. The next
-proposed milestone is Stage 7: typed multi-agent communication and handoffs. Stage 7 is
-not started automatically. Live-provider quality, durable workflow recovery, production
-privacy, and external write capability are not implied by the Stage 6 gate.
+Stage 9 provides exact, one-use, revalidated approval against an offline fixture write.
+Recommend Stage 10 reliability, recovery, and audit-query foundations. Production
+authentication, external-effect reconciliation, and real connector safety remain
+unproven. No Stage 10 implementation or production write integration has begun.

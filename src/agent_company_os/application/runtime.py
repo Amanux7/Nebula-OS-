@@ -35,11 +35,13 @@ from agent_company_os.domain.errors import (
 from agent_company_os.domain.events import Event, EventType
 from agent_company_os.domain.execution import Execution, ExecutionStatus
 from agent_company_os.domain.goal import Goal, GoalStatus
+from agent_company_os.domain.governance import ActionIntentId
 from agent_company_os.domain.ids import TaskAttemptId, Version, WorkspaceId
 from agent_company_os.domain.task import Task, TaskStatus
 from agent_company_os.domain.task_attempt import TaskAttempt, TaskAttemptStatus
 from agent_company_os.domain.transitions import StateTransition, SubjectType
 from agent_company_os.ports.clock import Clock
+from agent_company_os.ports.communication import CommunicationRuntimePort
 from agent_company_os.ports.ids import IdGenerator
 from agent_company_os.ports.knowledge import KnowledgeRuntimePort
 from agent_company_os.ports.memory import MemoryRuntimePort
@@ -70,6 +72,7 @@ class AgentRuntimeService:
         tools: ToolRuntimePort | None = None,
         knowledge: KnowledgeRuntimePort | None = None,
         memory: MemoryRuntimePort | None = None,
+        communication: CommunicationRuntimePort | None = None,
     ) -> None:
         self.store = store
         self.clock = clock
@@ -78,6 +81,7 @@ class AgentRuntimeService:
         self.tools = tools
         self.knowledge = knowledge
         self.memory = memory
+        self.communication = communication
         self.domain = DomainService(store.domain, clock, ids)
         self.assembler = ContextAssembler()
         self.policy = ActionPolicy()
@@ -90,6 +94,7 @@ class AgentRuntimeService:
         attempt_id: TaskAttemptId,
         context: SuppliedContext,
         limits: RuntimeLimits | None = None,
+        organization_version: Version | None = None,
     ) -> AgentRun:
         with self.store.atomic():
             limits = limits or RuntimeLimits()
@@ -110,14 +115,19 @@ class AgentRuntimeService:
                 context,
                 self.clock.now(),
                 self.clock.now() + timedelta(seconds=limits.execution_seconds),
-                runtime_protocol="single-agent-memory-v1"
+                organization_version=organization_version,
+                runtime_protocol="single-agent-governance-v1"
+                if self.tools is not None and self.tools.governance_enabled
+                else "single-agent-memory-v1"
                 if definition.memory_access.scopes
                 else "single-agent-knowledge-v1"
                 if definition.knowledge_scope.source_ids
                 else "single-agent-tools-v1"
                 if ActionType.CALL_TOOL in definition.allowed_actions
                 else "single-agent-v1",
-                policy_version="governed-memory-v1"
+                policy_version="consequential-actions-v1"
+                if self.tools is not None and self.tools.governance_enabled
+                else "governed-memory-v1"
                 if definition.memory_access.scopes
                 else "bounded-knowledge-tools-v1"
                 if definition.knowledge_scope.source_ids
@@ -200,7 +210,9 @@ class AgentRuntimeService:
                         run.policy_version != self.policy.version_for(run)
                         or run.runtime_protocol
                         != (
-                            "single-agent-memory-v1"
+                            "single-agent-governance-v1"
+                            if self.tools is not None and self.tools.governance_enabled
+                            else "single-agent-memory-v1"
                             if memory_enabled
                             else "single-agent-knowledge-v1"
                             if knowledge_enabled
@@ -243,6 +255,7 @@ class AgentRuntimeService:
                         self.tools.descriptors(claimed) if self.tools else (),
                         self.knowledge.active_pack(claimed) if self.knowledge else None,
                         self.memory.active_pack(claimed) if self.memory else None,
+                        self.communication.context_for(claimed) if self.communication else None,
                     )
                     started = self.clock.now()
                 # Never hold a store lock across a model call. Adapter is cooperative async.
@@ -332,6 +345,18 @@ class AgentRuntimeService:
                     missing: tuple[str, ...] = ()
                     kind = ObservationKind.ACTION_ACCEPTED
                     if isinstance(decision.payload, CompleteTask):
+                        consequential = tuple(
+                            g
+                            for g in self.store.governed_actions(workspace_id)
+                            if g.intent.run_id == current.id
+                        )
+                        successful = {
+                            r.invocation.id
+                            for r in self.store.tool_receipts(workspace_id, current.id)
+                            if r.output is not None
+                        }
+                        if any(g.invocation_id not in successful for g in consequential):
+                            raise ModelFailure("consequential_action_unresolved")
                         result = validate_brief(
                             decision.payload,
                             current.context,
@@ -422,6 +447,8 @@ class AgentRuntimeService:
             self._version(run, expected_version)
             if run.status is not AgentRunStatus.WAITING:
                 raise InvariantViolation("resume_requires_waiting_run")
+            if run.working_state.invocation_pending:
+                raise InvariantViolation("approval_requires_exact_intent_resume")
             if self.clock.now() >= run.deadline:
                 return self._failure(workspace_id, run_id, "deadline_exceeded")
             if context.required_keys != run.context.required_keys:
@@ -473,6 +500,19 @@ class AgentRuntimeService:
             if run.status not in (AgentRunStatus.RUNNING, AgentRunStatus.WAITING):
                 raise InvariantViolation("terminal_run_cannot_cancel")
             return self._failure(workspace_id, run_id, "cancelled", cancelled=True)
+
+    def yield_for_handoff(
+        self,
+        workspace_id: WorkspaceId,
+        run_id: AgentRunId,
+        expected_version: Version,
+    ) -> AgentRun:
+        """End one attempt without cancelling the logical Task, enabling reassignment."""
+        run = self.store.get_run(workspace_id, run_id)
+        self._version(run, expected_version)
+        if run.status not in {AgentRunStatus.RUNNING, AgentRunStatus.WAITING}:
+            raise InvariantViolation("handoff_requires_active_agent_run")
+        return self._failure(workspace_id, run_id, "handoff_requested")
 
     def _deadline(self, run: AgentRun) -> None:
         if self.clock.now() >= run.deadline:
@@ -555,6 +595,20 @@ class AgentRuntimeService:
             )
             self._event(updated, failure_type, (("error_code", code),))
             return updated
+
+    async def resume_approval(
+        self,
+        workspace_id: WorkspaceId,
+        run_id: AgentRunId,
+        intent_id: ActionIntentId,
+        expected_version: Version,
+    ) -> AgentRun:
+        if self.tools is None:
+            raise InvariantViolation("approval_requires_tool_runtime")
+        run = await self.tools.resume_intent(workspace_id, run_id, intent_id, expected_version)
+        if run.status is AgentRunStatus.RUNNING and not run.working_state.invocation_pending:
+            return await self.drive(workspace_id, run_id, run.version)
+        return run
 
     def _save(self, previous: AgentRun, updated: AgentRun, event_type: EventType) -> None:
         transition = None

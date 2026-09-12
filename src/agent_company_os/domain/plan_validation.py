@@ -12,6 +12,7 @@ from agent_company_os.domain.orchestration import (
 def _eligible(requirements: AgentRequirements, agent: AgentCatalogItem) -> bool:
     return (
         set(requirements.capabilities) <= set(agent.capabilities)
+        and set(requirements.capability_ids) <= set(agent.capability_ids)
         and set(requirements.tool_ids) <= set(agent.tool_ids)
         and set(requirements.knowledge_source_ids) <= set(agent.knowledge_source_ids)
         and set(requirements.memory_scopes) <= set(agent.memory_scopes)

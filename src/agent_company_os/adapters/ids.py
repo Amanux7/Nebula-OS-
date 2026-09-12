@@ -4,6 +4,7 @@ from collections import defaultdict
 from uuid import uuid4
 
 from agent_company_os.domain.agent import ActionId, AgentRunId, ObservationId
+from agent_company_os.domain.communication import AgentMessageId, HandoffId, MessageThreadId
 from agent_company_os.domain.ids import (
     EventId,
     ExecutionId,
@@ -20,10 +21,37 @@ from agent_company_os.domain.orchestration import (
     OrchestrationPlanId,
     OrchestrationRunId,
 )
+from agent_company_os.domain.organization_ids import (
+    CapabilityId,
+    DepartmentId,
+    OrganizationGraphId,
+    OrgRoleId,
+)
 from agent_company_os.domain.tools import ToolInvocationId, ToolReceiptId
 
 
 class SystemIdGenerator:
+    def organization_graph_id(self) -> OrganizationGraphId:
+        return OrganizationGraphId(str(uuid4()))
+
+    def department_id(self) -> DepartmentId:
+        return DepartmentId(str(uuid4()))
+
+    def org_role_id(self) -> OrgRoleId:
+        return OrgRoleId(str(uuid4()))
+
+    def capability_id(self) -> CapabilityId:
+        return CapabilityId(str(uuid4()))
+
+    def agent_message_id(self) -> AgentMessageId:
+        return AgentMessageId(str(uuid4()))
+
+    def message_thread_id(self) -> MessageThreadId:
+        return MessageThreadId(str(uuid4()))
+
+    def handoff_id(self) -> HandoffId:
+        return HandoffId(str(uuid4()))
+
     def orchestration_run_id(self) -> OrchestrationRunId:
         return OrchestrationRunId(str(uuid4()))
 
@@ -86,6 +114,27 @@ class SystemIdGenerator:
 
 
 class DeterministicIdGenerator:
+    def organization_graph_id(self) -> OrganizationGraphId:
+        return OrganizationGraphId(self._next("organization_graph"))
+
+    def department_id(self) -> DepartmentId:
+        return DepartmentId(self._next("department"))
+
+    def org_role_id(self) -> OrgRoleId:
+        return OrgRoleId(self._next("org_role"))
+
+    def capability_id(self) -> CapabilityId:
+        return CapabilityId(self._next("capability"))
+
+    def agent_message_id(self) -> AgentMessageId:
+        return AgentMessageId(self._next("agent-message"))
+
+    def message_thread_id(self) -> MessageThreadId:
+        return MessageThreadId(self._next("message-thread"))
+
+    def handoff_id(self) -> HandoffId:
+        return HandoffId(self._next("handoff"))
+
     def orchestration_run_id(self) -> OrchestrationRunId:
         return OrchestrationRunId(self._next("orchestration-run"))
 

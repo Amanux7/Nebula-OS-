@@ -9,6 +9,7 @@ from agent_company_os.domain.agent import (
     Observation,
     SuppliedContext,
 )
+from agent_company_os.domain.communication import AgentMessageContext
 from agent_company_os.domain.knowledge import EvidencePack
 from agent_company_os.domain.memory import MemoryContextPack
 from agent_company_os.domain.tools import ToolVersion
@@ -30,6 +31,7 @@ class AgentModelRequest:
     available_tools: tuple[ToolVersion, ...] = ()
     knowledge_evidence: EvidencePack | None = None
     memory_context: MemoryContextPack | None = None
+    agent_messages: AgentMessageContext | None = None
 
 
 class ModelPort(Protocol):

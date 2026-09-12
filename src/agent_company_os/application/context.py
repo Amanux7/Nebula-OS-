@@ -1,6 +1,7 @@
 """Deterministic context bounding and low-risk action policy."""
 
 from agent_company_os.domain.agent import ActionType, AgentRun
+from agent_company_os.domain.communication import AgentMessageContext, payload_chars
 from agent_company_os.domain.decisions import ModelDecision, ModelFailure
 from agent_company_os.domain.goal import Goal
 from agent_company_os.domain.knowledge import EvidencePack
@@ -19,6 +20,7 @@ class ContextAssembler:
         tools: tuple[ToolVersion, ...] = (),
         knowledge: EvidencePack | None = None,
         memory: MemoryContextPack | None = None,
+        agent_messages: AgentMessageContext | None = None,
     ) -> AgentModelRequest:
         values = [
             goal.objective,
@@ -51,6 +53,20 @@ class ContextAssembler:
                     str(tool.definition.id),
                 )
             )
+        if agent_messages is not None:
+            for message in agent_messages.messages:
+                values.extend(
+                    (
+                        str(message.message_id),
+                        str(message.sender_agent_run_id),
+                        str(message.sender_definition_id),
+                        message.kind.value,
+                        message.correlation_id,
+                        message.trust,
+                    )
+                )
+                values.append("x" * payload_chars(message.payload))
+                values.extend(reference.reference_id for reference in message.references)
         if (
             sum(len(value) for value in values)
             + (knowledge.context_chars if knowledge else 0)
@@ -72,6 +88,7 @@ class ContextAssembler:
             available_tools=tools,
             knowledge_evidence=knowledge,
             memory_context=memory,
+            agent_messages=agent_messages,
         )
 
 
@@ -80,6 +97,8 @@ class ActionPolicy:
 
     @staticmethod
     def version_for(run: AgentRun) -> str:
+        if run.runtime_protocol == "single-agent-governance-v1":
+            return "consequential-actions-v1"
         if run.definition_version.memory_access.scopes:
             return "governed-memory-v1"
         if run.definition_version.knowledge_scope.source_ids:

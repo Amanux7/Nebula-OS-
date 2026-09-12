@@ -19,6 +19,8 @@ from agent_company_os.domain.ids import (
 )
 from agent_company_os.domain.knowledge import KnowledgeSourceId
 from agent_company_os.domain.memory import MemoryScope
+from agent_company_os.domain.organization import OrganizationSnapshot
+from agent_company_os.domain.organization_ids import CapabilityId, DepartmentId, OrgRoleId
 from agent_company_os.domain.tools import ToolId
 from agent_company_os.domain.validation import clean_required_text, require_utc
 
@@ -81,9 +83,14 @@ class AgentRequirements:
     knowledge_source_ids: tuple[KnowledgeSourceId, ...] = ()
     memory_scopes: tuple[MemoryScope, ...] = ()
     min_autonomy: int = 0
+    capability_ids: tuple[CapabilityId, ...] = ()
+    required_department: DepartmentId | None = None
+    preferred_department: DepartmentId | None = None
+    organizational_role: OrgRoleId | None = None
 
     def __post_init__(self) -> None:
         collections = (
+            self.capability_ids,
             self.capabilities,
             self.tool_ids,
             self.knowledge_source_ids,
@@ -96,9 +103,20 @@ class AgentRequirements:
                 not capability or len(capability) > 64 or capability != capability.casefold()
                 for capability in self.capabilities
             )
-            or self.min_autonomy not in (0, 1, 2)
+            or type(self.min_autonomy) is not int
+            or self.min_autonomy not in range(5)
         ):
             raise InvariantViolation("agent_requirements_bound")
+        if (
+            any(not isinstance(c, CapabilityId) for c in self.capability_ids)
+            or self.required_department is not None
+            and not isinstance(self.required_department, DepartmentId)
+            or self.preferred_department is not None
+            and not isinstance(self.preferred_department, DepartmentId)
+            or self.organizational_role is not None
+            and not isinstance(self.organizational_role, OrgRoleId)
+        ):
+            raise InvariantViolation("organization_requirements_schema")
 
 
 @dataclass(frozen=True)
@@ -152,6 +170,7 @@ class AgentCatalogItem:
     knowledge_source_ids: tuple[KnowledgeSourceId, ...]
     memory_scopes: tuple[MemoryScope, ...]
     autonomy_ceiling: int
+    capability_ids: tuple[CapabilityId, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -241,6 +260,8 @@ class OrchestrationRun:
     failed_attempt_count: int = 0
     escalation_reason: str | None = None
     ended_at: datetime | None = None
+    organization: OrganizationSnapshot | None = None
+    source_department: DepartmentId | None = None
 
     def __post_init__(self) -> None:
         require_utc(self.created_at, "created_at")

@@ -1,5 +1,31 @@
 # Agent Evaluation Strategy
 
+## Stage 9 consequential-action governance
+
+Stage 9 evaluates deterministic authorization, not whether a model chooses desirable
+consequential actions or whether humans reliably understand previews. Scripted attacks
+cannot grant approval through model JSON, role text, or missing Tool permission.
+The department approval/rejection scenarios are contract evidence, not a real-customer
+trial. Human comprehension, approver calibration, useful Level 3 policies, and realistic
+connector failure behavior remain future evaluated questions.
+
+## Stage 8 organizational foundation
+
+A small fictional Aurora Desk organization supplies executable directory, policy,
+version-history, injection, and permission-inheritance cases in tests/test_organization.py.
+These establish deterministic contracts, not optimal business routing, productivity,
+or live-model quality. Calibrated workflow and human/model evaluation remain deferred.
+
+## Stage 7 communication evaluation
+
+The Stage 7 fixtures separate protocol validity—authorization, schema, scope,
+correlation, boundedness, delivery, lineage—from communication quality. Deterministic
+tests prove the former. Whether a message was useful, a handoff was necessary, the
+recipient was optimal, or communication improved an outcome remains unmeasured. Future
+metrics include handoff success rate, messages per completed Goal, clarification
+resolution, unnecessary-message rate, loop rate, and communication-induced latency;
+no performance values are claimed.
+
 ## Stage 6 orchestration evaluation
 
 Stage 6 evaluates software semantics, not model planning quality. The fixture set covers

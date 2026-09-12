@@ -16,6 +16,7 @@ from agent_company_os.domain.ids import (
 )
 from agent_company_os.domain.knowledge import EvidencePackId, KnowledgeScope
 from agent_company_os.domain.memory import MemoryAccessPolicy, MemoryContextPackId
+from agent_company_os.domain.organization_ids import CapabilityId
 from agent_company_os.domain.tools import ToolGrant, ToolObservationData
 from agent_company_os.domain.validation import clean_required_text, require_utc
 
@@ -65,8 +66,18 @@ class AgentDefinitionVersion:
     memory_access: MemoryAccessPolicy = MemoryAccessPolicy()
     capabilities: tuple[str, ...] = ()
     enabled: bool = True
+    communication_enabled: bool = False
+    allowed_recipient_roles: tuple[str, ...] = ()
+    capability_ids: tuple[CapabilityId, ...] = ()
 
     def __post_init__(self) -> None:
+        if (
+            not isinstance(self.capability_ids, tuple)
+            or len(self.capability_ids) > 10
+            or any(not isinstance(c, CapabilityId) for c in self.capability_ids)
+            or len(set(self.capability_ids)) != len(self.capability_ids)
+        ):
+            raise InvariantViolation("agent_capability_ids")
         if not isinstance(self.knowledge_scope, KnowledgeScope):
             raise InvariantViolation("knowledge_scope_type")
         if not isinstance(self.memory_access, MemoryAccessPolicy):
@@ -83,6 +94,14 @@ class AgentDefinitionVersion:
                 for capability in self.capabilities
             )
             or type(self.enabled) is not bool
+            or type(self.communication_enabled) is not bool
+            or not isinstance(self.allowed_recipient_roles, tuple)
+            or len(self.allowed_recipient_roles) > 10
+            or len(set(self.allowed_recipient_roles)) != len(self.allowed_recipient_roles)
+            or any(
+                not isinstance(role, str) or not role or len(role) > 64
+                for role in self.allowed_recipient_roles
+            )
         ):
             raise InvariantViolation("agent_capability_catalog")
         if (
@@ -96,7 +115,11 @@ class AgentDefinitionVersion:
             clean_required_text(value, "agent_configuration")
             if len(value) > 4000:
                 raise InvariantViolation("agent_configuration_size")
-        if self.autonomy_ceiling not in (0, 1, 2) or self.schema_version != 1:
+        if (
+            type(self.autonomy_ceiling) is not int
+            or self.autonomy_ceiling not in range(5)
+            or self.schema_version != 1
+        ):
             raise InvariantViolation("agent_configuration_policy")
         if not isinstance(self.allowed_actions, tuple) or any(
             not isinstance(action, ActionType) for action in self.allowed_actions
@@ -267,6 +290,7 @@ class AgentRun:
     runtime_protocol: str = "single-agent-v1"
     policy_version: str = "internal-actions-v1"
     evaluator_version: str = "supplied-facts-v1"
+    organization_version: Version | None = None
 
     def __post_init__(self) -> None:
         require_utc(self.created_at, "created_at")

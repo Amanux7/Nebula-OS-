@@ -6,6 +6,8 @@ from dataclasses import replace
 from hashlib import sha256
 from urllib.parse import quote
 
+from agent_company_os.application.governance import GovernanceService
+from agent_company_os.application.service import DomainService
 from agent_company_os.application.tool_validation import input_json, validate_input, validate_output
 from agent_company_os.domain.agent import (
     ActionType,
@@ -19,8 +21,11 @@ from agent_company_os.domain.agent import (
 from agent_company_os.domain.decisions import Action, CallTool, ModelFailure
 from agent_company_os.domain.errors import InvariantViolation, VersionConflict
 from agent_company_os.domain.events import Event, EventType
+from agent_company_os.domain.governance import ActionIntentId, ApprovalEffect, GovernedAction
 from agent_company_os.domain.ids import Version, WorkspaceId
 from agent_company_os.domain.tools import (
+    ExecutorKind,
+    FixtureMessageInput,
     ToolError,
     ToolFailure,
     ToolInvocation,
@@ -31,7 +36,7 @@ from agent_company_os.domain.tools import (
     ToolRisk,
     ToolVersion,
 )
-from agent_company_os.domain.transitions import SubjectType
+from agent_company_os.domain.transitions import StateTransition, SubjectType
 from agent_company_os.ports.clock import Clock
 from agent_company_os.ports.ids import IdGenerator
 from agent_company_os.ports.runtime_store import RuntimeStore
@@ -40,16 +45,31 @@ from agent_company_os.ports.tools import ToolRegistryPort
 
 class ToolRuntimeService:
     def __init__(
-        self, store: RuntimeStore, registry: ToolRegistryPort, clock: Clock, ids: IdGenerator
+        self,
+        store: RuntimeStore,
+        registry: ToolRegistryPort,
+        clock: Clock,
+        ids: IdGenerator,
+        governance: GovernanceService | None = None,
     ) -> None:
         self.store, self.registry, self.clock, self.ids = store, registry, clock, ids
+        if governance is not None and governance.store is not store:
+            raise InvariantViolation("governance_requires_shared_transaction")
+        self.governance = governance
+
+    @property
+    def governance_enabled(self) -> bool:
+        return self.governance is not None
 
     def descriptors(self, run: AgentRun) -> tuple[ToolVersion, ...]:
         versions = []
         for grant in run.definition_version.allowed_tools:
             try:
                 version = self.registry.resolve(run.workspace_id, grant).version
-                if version.definition.risk is ToolRisk.READ_ONLY:
+                if version.definition.risk is ToolRisk.READ_ONLY or (
+                    self.governance is not None
+                    and version.executor_kind is ExecutorKind.SEND_FIXTURE_MESSAGE
+                ):
                     versions.append(version)
             except ToolFailure:
                 continue
@@ -165,6 +185,8 @@ class ToolRuntimeService:
             invocations = self.store.tool_invocations(workspace_id, run_id)
             existing = next((item for item in invocations if item.action_id == action.id), None)
             if existing is not None:
+                if existing.tool_version.executor_kind is ExecutorKind.SEND_FIXTURE_MESSAGE:
+                    raise InvariantViolation("consequential_action_replay")
                 if existing.status is ToolInvocationStatus.RUNNING:
                     raise InvariantViolation("tool_invocation_in_progress")
                 return run  # Same host Action ID replays history, never executes twice.
@@ -187,6 +209,7 @@ class ToolRuntimeService:
                 ),
                 None,
             )
+            governed: GovernedAction | None = None
             try:
                 if grant is None:
                     code = (
@@ -197,9 +220,23 @@ class ToolRuntimeService:
                     raise ToolFailure(code)
                 resolved = self.registry.resolve(workspace_id, grant)
                 version = resolved.version
-                if version.definition.risk is not ToolRisk.READ_ONLY:
-                    raise ToolFailure(ToolError.UNAUTHORIZED)
                 request = validate_input(payload.arguments_json, version)
+                if isinstance(request, FixtureMessageInput):
+                    if self.governance is None:
+                        raise ToolFailure(ToolError.UNAUTHORIZED)
+                    try:
+                        governed = self.governance.prepare(run, action, version, request)
+                    except InvariantViolation:
+                        raise ToolFailure(ToolError.UNAUTHORIZED) from None
+                    if governed.intent.effect is ApprovalEffect.DENY:
+                        self.governance.event(
+                            governed, EventType.ACTION_EXECUTION_DENIED, "policy_denied"
+                        )
+                        raise ToolFailure(ToolError.UNAUTHORIZED)
+                    if not self.governance.allowed(governed):
+                        return self._approval_wait(run)
+                elif version.definition.risk is not ToolRisk.READ_ONLY:
+                    raise ToolFailure(ToolError.UNAUTHORIZED)
             except ToolFailure as error:
                 self._event(
                     run,
@@ -254,6 +291,8 @@ class ToolRuntimeService:
                 self.clock.now(),
             )
             self.store.add_tool_invocation(invocation)
+            if governed is not None and self.governance is not None:
+                self.governance.claim(governed, invocation)
             self._event(
                 claimed,
                 EventType.TOOL_INVOCATION_STARTED,
@@ -345,9 +384,15 @@ class ToolRuntimeService:
                 output,
                 input_bytes,
                 output_bytes,
-                "observed" if error is None else "unknown",
+                "observed"
+                if error is None
+                else "observed_failure"
+                if error is ToolError.REJECTED
+                else "unknown",
             )
             self.store.finish_tool_invocation(receipt)
+            if self.governance is not None:
+                self.governance.consumed(finished)
             duration = max(
                 0, int((self.clock.now() - invocation.started_at).total_seconds() * 1000)
             )
@@ -378,3 +423,100 @@ class ToolRuntimeService:
                 output.notes if output else "",
             )
             return self._observe(run, action, data)
+
+    def _approval_transition(self, run: AgentRun, status: AgentRunStatus) -> AgentRun:
+        updated = run.evolve(at=self.clock.now(), status=status)
+        transition = StateTransition(
+            self.ids.state_transition_id(),
+            run.workspace_id,
+            SubjectType.AGENT_RUN,
+            str(run.id),
+            run.status.value,
+            status.value,
+            "approval_wait_resume",
+            run.version,
+            updated.version,
+            self.clock.now(),
+        )
+        self.store.save_run(updated, run.version, transition)
+        return updated
+
+    def _approval_wait(self, run: AgentRun) -> AgentRun:
+        domain = DomainService(self.store.domain, self.clock, self.ids)
+        execution = self.store.domain.get_execution(run.execution_id)
+        domain.wait_execution(execution.id, execution.version)
+        return self._approval_transition(run, AgentRunStatus.WAITING)
+
+    async def resume_intent(
+        self,
+        workspace_id: WorkspaceId,
+        run_id: AgentRunId,
+        intent_id: ActionIntentId,
+        expected_version: Version,
+    ) -> AgentRun:
+        if self.governance is None:
+            raise InvariantViolation("governance_required")
+        # Lazy expiry is an audit mutation even when execution is refused.
+        self.governance.expire(workspace_id, intent_id)
+        denied = False
+        with self.store.atomic():
+            record = self.store.governed_action(workspace_id, intent_id)
+            run = self.store.get_run(workspace_id, run_id)
+            if record.intent.run_id != run_id:
+                raise InvariantViolation("approval_actor_binding")
+            action = self.store.action(workspace_id, record.intent.action_id)
+            try:
+                version = self.registry.resolve(workspace_id, record.intent.tool.grant).version
+                request = validate_input(record.intent.arguments_json, version)
+                if (
+                    not isinstance(request, FixtureMessageInput)
+                    or run.version != expected_version
+                    or run.status is not AgentRunStatus.WAITING
+                    or not run.working_state.invocation_pending
+                    or self.clock.now() >= run.deadline
+                ):
+                    raise InvariantViolation("approval_resume_state")
+                self.governance.validate(record, run, action, version, request)
+                if not self.governance.allowed(record):
+                    raise InvariantViolation("approval_not_available")
+                execution = self.store.domain.get_execution(run.execution_id)
+                # Validate all other parents before changing WAITING to RUNNING.
+                if (
+                    self.store.domain.get_goal(run.goal_id).status != "active"
+                    or self.store.domain.get_task(run.task_id).status != "in_progress"
+                    or self.store.domain.get_task_attempt(run.task_attempt_id).status != "running"
+                    or execution.status != "waiting"
+                ):
+                    raise InvariantViolation("approval_parent_state")
+            except (InvariantViolation, ToolFailure):
+                self.governance.event(
+                    record,
+                    EventType.ACTION_EXECUTION_DENIED,
+                    "replay_prevented"
+                    if record.invocation_id is not None
+                    else "revalidation_failed",
+                )
+                denied = True
+            if not denied:
+                DomainService(self.store.domain, self.clock, self.ids).resume_execution(
+                    execution.id, execution.version
+                )
+                run = self._approval_transition(run, AgentRunStatus.RUNNING)
+        if denied:
+            raise InvariantViolation("approval_revalidation_failed")
+        try:
+            return await self.invoke(workspace_id, run_id, action, run.version)
+        except Exception:
+            # A rolled-back dispatch claim performed no I/O. Restore a recoverable wait;
+            # never release a reservation once executor entry may have occurred.
+            with self.store.atomic():
+                latest = self.store.get_run(workspace_id, run_id)
+                record = self.store.governed_action(workspace_id, intent_id)
+                if (
+                    record.invocation_id is None
+                    and latest.version == run.version
+                    and latest.status is AgentRunStatus.RUNNING
+                    and latest.working_state.invocation_pending
+                ):
+                    self._approval_wait(latest)
+            raise

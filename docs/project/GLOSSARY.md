@@ -1,5 +1,47 @@
 # Glossary
 
+## Stage 9 consequential-action governance
+
+- **ActionIntent:** exact immutable consequential proposal, bound to actor, ToolVersion,
+  structured payload/destination, canonical risk, policy, fingerprint, and expiry.
+- **ApprovalPolicy:** deterministic deny/require-approval/allow-within-bounds evaluator;
+  its tool allowlist narrows independent AgentDefinitionVersion grants.
+- **ApprovalRequest:** one exact intent awaiting review, never permission for future work.
+- **ApprovalDecision:** append-only explicit reviewer outcome, with exact digest and policy.
+- **ReviewerPrincipal:** typed workspace-local trusted host identity; not production authentication.
+- **GovernedAction:** versioned intent/request/decision, cancellation, reservation, and consumption record.
+- **AutonomyLevel:** Observe 0, Recommend 1, Draft 2, Bounded Execute 3, Autonomous Within Policy 4.
+  Level 4 consequential execution is disabled.
+- **Outcome certainty:** not_executed, observed_success, observed_failure, or outcome_unknown;
+  timeout alone cannot establish that an external operation did not happen.
+- **Approval reservation:** the one-use local dispatch claim; consumption follows terminal
+  reconciliation even if the result is failed or unknown, preventing unsafe reuse.
+
+## Stage 8 organizational foundation
+
+OrganizationGraph is a stable workspace structural identity; OrganizationGraphVersion
+is its immutable bounded content. OrganizationSnapshot identifies the exact version and
+capture time pinned to an OrchestrationRun. OrgRole denotes responsibility, independently
+of runtime roles and permissions. CapabilityDefinition/CapabilityId provide canonical
+capability identity. DepartmentMembership binds agent definition, department, and role
+with lifecycle, discoverability, and optional dates. ReportingRelationship is a governed
+reports-to edge. RegisteredAgent is an exact configuration reference, not a copy.
+AgentRegistry discovers candidates; AgentSelector selects. OrganizationPolicy restricts
+directional department routes without granting authority.
+
+## Stage 7 communication vocabulary
+
+| Term | Definition | Boundary |
+|---|---|---|
+| Multi-Agent Communication | Controlled exchange of typed, bounded, provenance-aware work information between coordinated runtime participants. | Not free-form chat, shared state, Knowledge, or permission transfer. |
+| AgentMessage | Immutable point-to-point envelope with exact participant/configuration, Task/Delegation, typed payload, reference, correlation, and policy lineage. | Delivery does not mean accepted or acted upon. |
+| MessageThread | Bounded correlation group inside one workspace and OrchestrationRun. | Not a public channel, inbox, broadcast, or pub/sub topic. |
+| CommunicationPolicy | Deterministic kinds, recipients, references, sizes, counts, depth, and timeout bounds. | Message/model content cannot widen it. |
+| AgentMessageContext | Deterministically ordered bounded message snapshot provided separately to one AgentRun. | Labeled untrusted; not supplied evidence, Knowledge, or Memory. |
+| HandoffRequest | Participant request for substantial responsibility/context transfer, resolved through orchestration. | Not a Delegation and cannot reassign a Task directly. |
+| Handoff | Governed transfer protocol whose accepted result is a canonical redelegation. | Distinct from a small clarification request. |
+| Reference re-authorization | Independent verification that a recipient may access every referenced result, receipt, Knowledge pack, or Memory pack. | Sender access never transfers automatically. |
+
 ## Stage 6 orchestration vocabulary
 
 | Term | Definition | Boundary |
