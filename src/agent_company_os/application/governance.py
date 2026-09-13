@@ -277,7 +277,7 @@ class GovernanceService:
             ),
             None,
         )
-        if record is not None and record.request is not None:
+        if record is not None and record.request is not None and not record.consumed:
             updated = replace(record, consumed=True, version=record.version.next())
             self.store.save_governed_action(updated, record.version)
             self.event(updated, EventType.APPROVAL_CONSUMED)

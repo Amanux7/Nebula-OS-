@@ -152,6 +152,13 @@ class ToolOutput:
     notes: str = ""
 
 
+@dataclass(frozen=True)
+class ToolRegistration:
+    tool_version: ToolVersion
+    enabled: bool = True
+    revision: int = 0
+
+
 class ToolInvocationStatus(StrEnum):
     RUNNING = "running"
     SUCCEEDED = "succeeded"
