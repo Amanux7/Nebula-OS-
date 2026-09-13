@@ -13,6 +13,10 @@ from agent_company_os.domain.validation import clean_required_text, require_utc
 
 
 class EventType(StrEnum):
+    RECOVERY_DETECTED = "recovery_detected"
+    RECOVERY_LOOKUP = "recovery_lookup"
+    RECOVERY_RECEIPT_RECONCILED = "recovery_receipt_reconciled"
+    RECOVERY_PARENT_RECONCILED = "recovery_parent_reconciled"
     ACTION_INTENT_CREATED = "action_intent_created"
     ACTION_INTENT_CANCELLED = "action_intent_cancelled"
     APPROVAL_REQUESTED = "approval_requested"

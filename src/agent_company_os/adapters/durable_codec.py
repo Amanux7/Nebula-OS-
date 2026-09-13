@@ -5,12 +5,25 @@ default filling, or executable objects are accepted from persisted input.
 """
 
 import json
+import math
 from dataclasses import fields, is_dataclass
 from datetime import datetime
 from enum import Enum
 from types import UnionType
-from typing import Any, get_args, get_origin, get_type_hints
+from typing import Any, Literal, TypeAliasType, get_args, get_origin, get_type_hints
 
+from agent_company_os.domain import (
+    agent,
+    communication,
+    decisions,
+    governance,
+    knowledge,
+    memory,
+    orchestration,
+    organization,
+    organization_ids,
+    tools,
+)
 from agent_company_os.domain.errors import InvariantViolation
 from agent_company_os.domain.events import Event
 from agent_company_os.domain.execution import Execution, ExecutionBounds
@@ -48,6 +61,118 @@ _RECORD_TYPES: tuple[type[object], ...] = (
     EventId,
     StateTransitionId,
     Version,
+    agent.AgentDefinitionId,
+    agent.AgentRunId,
+    agent.ActionId,
+    agent.ObservationId,
+    agent.AgentDefinition,
+    agent.AgentDefinitionVersion,
+    agent.RuntimeLimits,
+    agent.Fact,
+    agent.SourceText,
+    agent.SuppliedContext,
+    agent.Observation,
+    agent.ResearchBrief,
+    agent.AgentWorkingState,
+    agent.AgentRun,
+    decisions.Respond,
+    decisions.RequestMoreContext,
+    decisions.CompleteTask,
+    decisions.CallTool,
+    decisions.ModelDecision,
+    decisions.Action,
+    tools.ToolId,
+    tools.ToolInvocationId,
+    tools.ToolReceiptId,
+    tools.ToolGrant,
+    tools.ToolDefinition,
+    tools.RetryPolicy,
+    tools.ToolVersion,
+    tools.ToolRegistration,
+    tools.CompanyLookupInput,
+    tools.SourceLookupInput,
+    tools.FixtureMessageInput,
+    tools.ToolOutput,
+    tools.ToolInvocation,
+    tools.ToolReceipt,
+    tools.ToolObservationData,
+    governance.ActionIntentId,
+    governance.ReviewerId,
+    governance.ReviewerPrincipal,
+    governance.ApprovalPolicy,
+    governance.ActionIntent,
+    governance.ApprovalRequest,
+    governance.ApprovalDecision,
+    governance.GovernedAction,
+    knowledge.KnowledgeSourceId,
+    knowledge.KnowledgeChunkId,
+    knowledge.EvidencePackId,
+    knowledge.KnowledgeScope,
+    knowledge.IngestionLimits,
+    knowledge.KnowledgeFact,
+    knowledge.NormalizedContent,
+    knowledge.KnowledgeSource,
+    knowledge.KnowledgeSourceVersion,
+    knowledge.KnowledgeChunk,
+    knowledge.KnowledgeQuery,
+    knowledge.EvidenceCandidate,
+    knowledge.RetrievalResult,
+    knowledge.EvidencePack,
+    memory.MemoryCandidateId,
+    memory.MemoryEntryId,
+    memory.MemoryContextPackId,
+    memory.MemoryScope,
+    memory.MemoryAccessPolicy,
+    memory.MemoryProvenance,
+    memory.MemoryCandidate,
+    memory.MemoryEntry,
+    memory.MemoryQuery,
+    memory.MemoryHit,
+    memory.MemoryRetrievalResult,
+    memory.MemoryContextPack,
+    orchestration.OrchestrationRunId,
+    orchestration.OrchestrationPlanId,
+    orchestration.DelegationId,
+    orchestration.OrchestrationPolicy,
+    orchestration.AgentRequirements,
+    orchestration.PlannedTask,
+    orchestration.PlanProposal,
+    orchestration.PlanVersion,
+    orchestration.MaterializedTask,
+    orchestration.PlanMaterialization,
+    orchestration.OrchestrationRun,
+    orchestration.Delegation,
+    orchestration.DelegationAttempt,
+    orchestration.TaskResultReference,
+    organization.Department,
+    organization.OrgRole,
+    organization.CapabilityDefinition,
+    organization.DepartmentMembership,
+    organization.ReportingRelationship,
+    organization.RegisteredAgent,
+    organization.DepartmentRoute,
+    organization.OrganizationBounds,
+    organization.OrganizationPolicy,
+    organization.OrganizationGraph,
+    organization.OrganizationGraphVersion,
+    organization.OrganizationSnapshot,
+    organization_ids.OrganizationGraphId,
+    organization_ids.DepartmentId,
+    organization_ids.OrgRoleId,
+    organization_ids.CapabilityId,
+    communication.AgentMessageId,
+    communication.MessageThreadId,
+    communication.HandoffId,
+    communication.CommunicationPolicy,
+    communication.InformationPayload,
+    communication.RequestPayload,
+    communication.ResponsePayload,
+    communication.HandoffRequestPayload,
+    communication.HandoffResultPayload,
+    communication.CommunicationReference,
+    communication.MessageThread,
+    communication.AgentMessage,
+    communication.HandoffRequest,
 )
 
 
@@ -74,6 +199,8 @@ def _encode(value: object) -> object:
         return {field.name: _encode(getattr(value, field.name)) for field in fields(value)}
     if isinstance(value, tuple):
         return [_encode(item) for item in value]
+    if type(value) is float and math.isfinite(value):
+        return value
     if value is None or type(value) in (str, int, bool):
         return value
     raise _invalid()
@@ -81,7 +208,15 @@ def _encode(value: object) -> object:
 
 def _decode(value: object, expected: Any) -> Any:
     """Type hints describe a fixed allowlisted schema, not caller-selected types."""
+    if isinstance(expected, TypeAliasType):
+        return _decode(value, expected.__value__)
     origin = get_origin(expected)
+    if origin is Literal:
+        if not any(
+            type(value) is type(option) and value == option for option in get_args(expected)
+        ):
+            raise _invalid()
+        return value
     if origin is UnionType:
         for option in get_args(expected):
             try:
@@ -106,6 +241,14 @@ def _decode(value: object, expected: Any) -> Any:
         if type(value) is not expected:
             raise _invalid()
         return value
+    if expected is float:
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+        ):
+            raise _invalid()
+        return float(value)
     if expected is datetime:
         if not isinstance(value, str):
             raise _invalid()
@@ -122,7 +265,7 @@ def _decode(value: object, expected: Any) -> Any:
         names = {field.name for field in fields(expected)}
         if set(value) != names:
             raise _invalid()
-        hints = get_type_hints(expected)
+        hints = get_type_hints(expected, localns={kind.__name__: kind for kind in _RECORD_TYPES})
         return expected(**{name: _decode(value[name], hints[name]) for name in names})
     raise _invalid()
 
@@ -132,7 +275,8 @@ def encode_record(record: object) -> str:
         raise _invalid()
     payload = _encode(record)
     # Validate even records constructed by bypassing annotations or frozen setters.
-    _decode(payload, type(record))
+    if _decode(payload, type(record)) != record:
+        raise _invalid()
     return json.dumps(
         {"schema_version": 1, "type": type(record).__name__, "payload": payload},
         sort_keys=True,
@@ -156,5 +300,20 @@ def decode_record[T](serialized: str, expected: type[T]) -> T:
             raise _invalid()
         record: T = _decode(envelope["payload"], expected)
         return record
+    except (TypeError, ValueError, KeyError, AttributeError, RecursionError) as error:
+        raise _invalid() from error
+
+
+def encode_value(value: object, expected: Any) -> str:
+    """For adapter-owned typed collection keys/tuples; never caller-selected schemas."""
+    encoded = _encode(value)
+    if _decode(encoded, expected) != value:
+        raise _invalid()
+    return json.dumps(encoded, sort_keys=True, separators=(",", ":"), allow_nan=False)
+
+
+def decode_value(serialized: str, expected: Any) -> Any:
+    try:
+        return _decode(json.loads(serialized, object_pairs_hook=_pairs), expected)
     except (TypeError, ValueError, KeyError, AttributeError, RecursionError) as error:
         raise _invalid() from error
