@@ -37,6 +37,14 @@ TEntity = TypeVar("TEntity", bound=Workspace | Goal | Task | TaskAttempt | Execu
 
 
 class InMemoryDomainStore:
+    def executions(self, workspace_id: WorkspaceId) -> tuple[Execution, ...]:
+        self.get_workspace(workspace_id)
+        return tuple(e for e in self._executions.values() if e.workspace_id == workspace_id)
+
+    def task_attempts(self, workspace_id: WorkspaceId) -> tuple[TaskAttempt, ...]:
+        self.get_workspace(workspace_id)
+        return tuple(a for a in self._attempts.values() if a.workspace_id == workspace_id)
+
     def __init__(self) -> None:
         self._workspaces: dict[WorkspaceId, Workspace] = {}
         self._goals: dict[GoalId, Goal] = {}

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import wraps
+from typing import Concatenate
 
 from agent_company_os.domain.errors import InvariantViolation, VersionConflict, WorkspaceMismatch
 from agent_company_os.domain.events import Event, EventType
@@ -24,6 +26,17 @@ from agent_company_os.domain.workspace import Workspace
 from agent_company_os.ports.clock import Clock
 from agent_company_os.ports.ids import IdGenerator
 from agent_company_os.ports.store import DomainStore
+
+
+def _atomic_command[**P, T](
+    method: Callable[Concatenate[DomainService, P], T],
+) -> Callable[Concatenate[DomainService, P], T]:
+    @wraps(method)
+    def call(self: DomainService, /, *args: P.args, **kwargs: P.kwargs) -> T:
+        with self.store.transaction():
+            return method(self, *args, **kwargs)
+
+    return call
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,6 +77,7 @@ class DomainService:
         self.clock = clock
         self.ids = ids
 
+    @_atomic_command
     def create_workspace(self, name: str) -> Workspace:
         now = self.clock.now()
         workspace = Workspace.create(self.ids.workspace_id(), name, now)
@@ -79,6 +93,7 @@ class DomainService:
         )
         return workspace
 
+    @_atomic_command
     def create_goal(self, command: CreateGoalCommand) -> Goal:
         self.store.get_workspace(command.workspace_id)
         now = self.clock.now()
@@ -102,12 +117,14 @@ class DomainService:
         )
         return goal
 
+    @_atomic_command
     def activate_goal(self, goal_id: GoalId, expected_version: Version) -> Goal:
         goal = self.store.get_goal(goal_id)
         self._expect_version("Goal", str(goal.id), expected_version, goal.version)
         result = goal.activate(self.ids.state_transition_id(), self.clock.now())
         return self._save_goal(result, expected_version, EventType.GOAL_ACTIVATED)
 
+    @_atomic_command
     def satisfy_goal(self, goal_id: GoalId, expected_version: Version) -> Goal:
         goal = self.store.get_goal(goal_id)
         self._expect_version("Goal", str(goal.id), expected_version, goal.version)
@@ -117,18 +134,21 @@ class DomainService:
         result = goal.satisfy(self.ids.state_transition_id(), self.clock.now())
         return self._save_goal(result, expected_version, EventType.GOAL_SATISFIED)
 
+    @_atomic_command
     def close_goal_unsatisfied(self, goal_id: GoalId, expected_version: Version) -> Goal:
         goal = self.store.get_goal(goal_id)
         self._expect_version("Goal", str(goal.id), expected_version, goal.version)
         result = goal.close_unsatisfied(self.ids.state_transition_id(), self.clock.now())
         return self._save_goal(result, expected_version, EventType.GOAL_CLOSED_UNSATISFIED)
 
+    @_atomic_command
     def cancel_goal(self, goal_id: GoalId, expected_version: Version) -> Goal:
         goal = self.store.get_goal(goal_id)
         self._expect_version("Goal", str(goal.id), expected_version, goal.version)
         result = goal.cancel(self.ids.state_transition_id(), self.clock.now())
         return self._save_goal(result, expected_version, EventType.GOAL_CANCELLED)
 
+    @_atomic_command
     def create_task(self, command: CreateTaskCommand) -> Task:
         self.store.get_workspace(command.workspace_id)
         goal = self.store.get_goal(command.goal_id)
@@ -156,6 +176,7 @@ class DomainService:
         )
         return task
 
+    @_atomic_command
     def ready_task(self, task_id: TaskId, expected_version: Version) -> Task:
         task = self.store.get_task(task_id)
         self._expect_version("Task", str(task.id), expected_version, task.version)
@@ -166,6 +187,7 @@ class DomainService:
         )
         return self._save_task(result, expected_version, event_type)
 
+    @_atomic_command
     def start_task(self, task_id: TaskId, expected_version: Version) -> Task:
         task = self.store.get_task(task_id)
         self._expect_version("Task", str(task.id), expected_version, task.version)
@@ -175,6 +197,7 @@ class DomainService:
             EventType.TASK_STARTED,
         )
 
+    @_atomic_command
     def complete_task(
         self, task_id: TaskId, attempt_id: TaskAttemptId, expected_version: Version
     ) -> Task:
@@ -190,6 +213,7 @@ class DomainService:
             EventType.TASK_COMPLETED,
         )
 
+    @_atomic_command
     def fail_task(self, task_id: TaskId, expected_version: Version) -> Task:
         task = self.store.get_task(task_id)
         self._expect_version("Task", str(task.id), expected_version, task.version)
@@ -199,6 +223,7 @@ class DomainService:
             EventType.TASK_FAILED,
         )
 
+    @_atomic_command
     def cancel_task(self, task_id: TaskId, expected_version: Version) -> Task:
         task = self.store.get_task(task_id)
         self._expect_version("Task", str(task.id), expected_version, task.version)
@@ -208,6 +233,7 @@ class DomainService:
             EventType.TASK_CANCELLED,
         )
 
+    @_atomic_command
     def create_execution(self, command: CreateExecutionCommand) -> Execution:
         self.store.get_workspace(command.workspace_id)
         goal = self.store.get_goal(command.goal_id)
@@ -241,21 +267,25 @@ class DomainService:
         )
         return execution
 
+    @_atomic_command
     def start_execution(self, execution_id: ExecutionId, expected_version: Version) -> Execution:
         return self._change_execution(
             execution_id, expected_version, Execution.start, EventType.EXECUTION_STARTED
         )
 
+    @_atomic_command
     def wait_execution(self, execution_id: ExecutionId, expected_version: Version) -> Execution:
         return self._change_execution(
             execution_id, expected_version, Execution.wait, EventType.EXECUTION_WAITING
         )
 
+    @_atomic_command
     def resume_execution(self, execution_id: ExecutionId, expected_version: Version) -> Execution:
         return self._change_execution(
             execution_id, expected_version, Execution.resume, EventType.EXECUTION_RESUMED
         )
 
+    @_atomic_command
     def succeed_execution(self, execution_id: ExecutionId, expected_version: Version) -> Execution:
         execution = self.store.get_execution(execution_id)
         self._expect_version("Execution", str(execution.id), expected_version, execution.version)
@@ -271,6 +301,7 @@ class DomainService:
             EventType.EXECUTION_SUCCEEDED,
         )
 
+    @_atomic_command
     def fail_execution(
         self, execution_id: ExecutionId, expected_version: Version, reason: str
     ) -> Execution:
@@ -279,11 +310,13 @@ class DomainService:
         result = execution.fail(self.ids.state_transition_id(), self.clock.now(), reason)
         return self._save_execution(result, expected_version, EventType.EXECUTION_FAILED)
 
+    @_atomic_command
     def cancel_execution(self, execution_id: ExecutionId, expected_version: Version) -> Execution:
         return self._change_execution(
             execution_id, expected_version, Execution.cancel, EventType.EXECUTION_CANCELLED
         )
 
+    @_atomic_command
     def create_task_attempt(self, command: CreateTaskAttemptCommand) -> TaskAttempt:
         self.store.get_workspace(command.workspace_id)
         task = self.store.get_task(command.task_id)
@@ -325,6 +358,7 @@ class DomainService:
         )
         return attempt
 
+    @_atomic_command
     def start_task_attempt(
         self, attempt_id: TaskAttemptId, expected_version: Version
     ) -> TaskAttempt:
@@ -332,6 +366,7 @@ class DomainService:
             attempt_id, expected_version, TaskAttempt.start, EventType.TASK_ATTEMPT_STARTED
         )
 
+    @_atomic_command
     def succeed_task_attempt(
         self, attempt_id: TaskAttemptId, expected_version: Version
     ) -> TaskAttempt:
@@ -339,6 +374,7 @@ class DomainService:
             attempt_id, expected_version, TaskAttempt.succeed, EventType.TASK_ATTEMPT_SUCCEEDED
         )
 
+    @_atomic_command
     def fail_task_attempt(
         self, attempt_id: TaskAttemptId, expected_version: Version, reason: str
     ) -> TaskAttempt:
@@ -347,6 +383,7 @@ class DomainService:
         result = attempt.fail(self.ids.state_transition_id(), self.clock.now(), reason)
         return self._save_attempt(result, expected_version, EventType.TASK_ATTEMPT_FAILED)
 
+    @_atomic_command
     def cancel_task_attempt(
         self, attempt_id: TaskAttemptId, expected_version: Version
     ) -> TaskAttempt:

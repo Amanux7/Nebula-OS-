@@ -7,8 +7,18 @@ from pathlib import Path
 from agent_company_os.domain.errors import InvariantViolation
 
 
-def _migration() -> str:
-    return Path(__file__).with_name("migrations").joinpath("001_domain.sql").read_text("utf-8")
+def _migrations() -> tuple[str, ...]:
+    root = Path(__file__).with_name("migrations")
+    return tuple(
+        root.joinpath(name).read_text("utf-8") for name in ("001_domain.sql", "002_runtime.sql")
+    )
+
+
+def _expected() -> list[tuple[int, str]]:
+    return [
+        (number, sha256(script.encode()).hexdigest())
+        for number, script in enumerate(_migrations(), 1)
+    ]
 
 
 def migrate_database(path: Path) -> None:
@@ -16,20 +26,30 @@ def migrate_database(path: Path) -> None:
     connection = sqlite3.connect(path, isolation_level=None)
     try:
         connection.execute("PRAGMA foreign_keys = ON")
-        script = _migration()
-        checksum = sha256(script.encode()).hexdigest()
+        connection.execute("BEGIN IMMEDIATE")
         exists = connection.execute(
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name='schema_migrations'"
         ).fetchone()
-        if exists:
-            if connection.execute("SELECT version,checksum FROM schema_migrations").fetchall() != [
-                (1, checksum)
-            ]:
-                raise InvariantViolation("unsupported_database_migration")
-            return
-        # executescript is used ONLY for the shipped, trusted migration. Never caller SQL.
-        connection.executescript("BEGIN IMMEDIATE;\n" + script)
-        connection.execute("INSERT INTO schema_migrations VALUES (?,?)", (1, checksum))
+        history = (
+            connection.execute(
+                "SELECT version,checksum FROM schema_migrations ORDER BY version"
+            ).fetchall()
+            if exists
+            else []
+        )
+        expected = _expected()
+        if history != expected[: len(history)] or len(history) > len(expected):
+            raise InvariantViolation("unsupported_database_migration")
+        for number, script in enumerate(_migrations(), 1):
+            if number <= len(history):
+                continue
+            statement = ""
+            for line in script.splitlines(keepends=True):
+                statement += line
+                if sqlite3.complete_statement(statement):
+                    connection.execute(statement)
+                    statement = ""
+            connection.execute("INSERT INTO schema_migrations VALUES (?,?)", expected[number - 1])
         connection.commit()
     except BaseException:
         connection.rollback()
@@ -45,9 +65,11 @@ def open_database(path: Path) -> sqlite3.Connection:
     try:
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute("PRAGMA synchronous = FULL")
-        expected = [(1, sha256(_migration().encode()).hexdigest())]
+        expected = _expected()
         if (
-            connection.execute("SELECT version,checksum FROM schema_migrations").fetchall()
+            connection.execute(
+                "SELECT version,checksum FROM schema_migrations ORDER BY version"
+            ).fetchall()
             != expected
         ):
             raise InvariantViolation("unsupported_database_migration")

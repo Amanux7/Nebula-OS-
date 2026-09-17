@@ -14,6 +14,7 @@ from agent_company_os.application.service import (
 from agent_company_os.domain.agent import (
     AgentDefinitionVersion,
     AgentRun,
+    AgentRunId,
     AgentRunStatus,
     Fact,
     SourceText,
@@ -760,6 +761,8 @@ class OrchestrationService:
                 or delegation.orchestration_run_id != orchestration.id
                 or context.task_id != delegation.task_id
                 or orchestration.agent_run_count >= orchestration.policy.max_agent_runs
+                or self._failed_children(workspace_id, orchestration.id)
+                >= orchestration.policy.max_failed_attempts
             ):
                 raise InvariantViolation("delegation_execution_binding_or_budget")
             task = self.store.runtime.domain.get_task(delegation.task_id)
@@ -879,6 +882,32 @@ class OrchestrationService:
             raise
         return self._reconcile_result(workspace_id, orchestration_run_id, result)
 
+    def _failed_children(self, workspace: WorkspaceId, run_id: OrchestrationRunId) -> int:
+        identities = {
+            attempt.agent_run_id
+            for delegation in self.store.delegations(workspace, run_id)
+            for attempt in self.store.attempts(workspace, delegation.id)
+        }
+        return sum(
+            self.store.runtime.get_run(workspace, identity).status is AgentRunStatus.FAILED
+            for identity in identities
+        )
+
+    def reconcile_child(
+        self,
+        workspace: WorkspaceId,
+        run_id: OrchestrationRunId,
+        agent_run_id: AgentRunId,
+        expected: Version,
+    ) -> AgentRun:
+        """Repair committed child bookkeeping without model, planning, or Tool I/O."""
+        with self.store.atomic():
+            self._version(self.store.run(workspace, run_id), expected)
+            result = self.store.runtime.get_run(workspace, agent_run_id)
+            if result.status is AgentRunStatus.RUNNING:
+                raise InvariantViolation("recovery_requires_settled_child")
+            return self._reconcile_result(workspace, run_id, result)
+
     def _reconcile_result(
         self,
         workspace_id: WorkspaceId,
@@ -887,7 +916,29 @@ class OrchestrationService:
     ) -> AgentRun:
         with self.store.atomic():
             current = self.store.run(workspace_id, orchestration_run_id)
-            failed = result.status is AgentRunStatus.FAILED
+            if result != self.store.runtime.get_run(workspace_id, result.id) or not any(
+                attempt.agent_run_id == result.id
+                for delegation in self.store.delegations(workspace_id, current.id)
+                for attempt in self.store.attempts(workspace_id, delegation.id)
+            ):
+                raise InvariantViolation("orchestration_recovery_child_binding")
+            if current.status in {
+                OrchestrationStatus.COMPLETED,
+                OrchestrationStatus.CANCELLED,
+                OrchestrationStatus.FAILED,
+            }:
+                return result
+            if any(
+                e.event_type is EventType.ORCHESTRATION_CHILD_RECONCILED
+                and e.subject_id == str(current.id)
+                and dict(e.metadata).get("agent_run_id") == str(result.id)
+                and dict(e.metadata).get("agent_run_version") == str(result.version.value)
+                for e in self.store.events(workspace_id)
+            ):
+                return result
+            failures = max(
+                current.failed_attempt_count, self._failed_children(workspace_id, current.id)
+            )
             status = current.status
             reason = None
             if result.status is AgentRunStatus.WAITING:
@@ -897,12 +948,12 @@ class OrchestrationService:
                     if result.working_state.invocation_pending
                     else "required_context_missing",
                 )
-            elif failed and current.failed_attempt_count + 1 >= current.policy.max_failed_attempts:
+            elif failures >= current.policy.max_failed_attempts:
                 status, reason = OrchestrationStatus.WAITING, "failure_budget_exhausted"
             updated = current.evolve(
                 at=self.clock.now(),
                 status=status,
-                failed_delta=1 if failed else 0,
+                failed_delta=failures - current.failed_attempt_count,
                 escalation_reason=reason,
             )
             self.store.save_run(updated, current.version)
@@ -921,6 +972,14 @@ class OrchestrationService:
                     )
                     self.store.save_run(completed, updated.version)
                     self._event(completed, EventType.ORCHESTRATION_COMPLETED)
+            self._event(
+                self.store.run(workspace_id, current.id),
+                EventType.ORCHESTRATION_CHILD_RECONCILED,
+                (
+                    ("agent_run_id", str(result.id)),
+                    ("agent_run_version", str(result.version.value)),
+                ),
+            )
             return result
 
     def aggregate(self, workspace_id: WorkspaceId, run_id: OrchestrationRunId) -> GoalResultDraft:

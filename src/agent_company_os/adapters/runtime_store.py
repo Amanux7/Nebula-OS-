@@ -35,6 +35,10 @@ from agent_company_os.domain.transitions import StateTransition, SubjectType
 
 
 class InMemoryRuntimeStore:
+    def runs(self, workspace_id: WorkspaceId) -> tuple[AgentRun, ...]:
+        self.domain.get_workspace(workspace_id)
+        return tuple(run for run in self._runs.values() if run.workspace_id == workspace_id)
+
     def __init__(self, domain: InMemoryDomainStore) -> None:
         self.domain = domain
         self._definitions: dict[tuple[AgentDefinitionId, Version], AgentDefinitionVersion] = {}

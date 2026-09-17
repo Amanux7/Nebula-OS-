@@ -153,13 +153,14 @@ Stages are capability gates, not calendar estimates. A later stage begins only w
 - **Not built:** production writes, unrestricted Level 4, blanket approvals, production authentication, approval UI, distributed approvals, or new infrastructure.
 - **Evidence:** payload/destination/actor/policy/scope checks, replay/race/rollback/uncertainty tests, independent Tool authority, and Research → Product → Marketing approval/rejection scenarios.
 
-## Stage 10 — Reliability, recovery, and audit-query foundations (recommended)
+## Stage 10 — Reliability, recovery, and audit-query foundations
 
 - **Reason for recommendation:** Stage 9 proves local authorization but in-memory claims and receipts do not survive process loss. Recovery and accurate audit queries should precede real connectors and consequential-action UI.
-- **Proposed work:** requirement-backed durability ADR, dispatch/receipt recovery and reconciliation contracts, safe handling of unresolved claims, workspace-scoped audit queries, retention/redaction requirements, and crash/replay/fault evidence.
-- **Do not infer authorization:** no storage product, queue, distributed service, real integration, graph UI, or approval UI is selected or implemented by this recommendation.
+- **Implemented:** SQLite canonical service adapters behind existing ports, explicit migrations and strict codec, shared transactions/CAS, durable invocation/approval claims, independent remote fixture ledger, recovery classification and receipt repair, scoped audit queries, and retention/redaction foundations. See ADR-013.
+- **Evidence:** close/reopen tests across all canonical subsystems, abrupt subprocess death after remote commit, crash windows A–D, competing worker connections, storage faults, corruption rejection, and multi-department wait/resume. Exact gate results are in [Stage 10](../STAGE_10_REPORT.md).
+- **Not implemented:** queue, distributed service, real integration, graph UI, approval UI, automatic post-claim redispatch, or production recovery authentication.
 - **Former UI milestone:** execution graphs, approval views, accessibility, and timeline projections remain useful later work over proven canonical records.
-- **Status:** not started; requires a separate Stage 10 request.
+- **Status:** PASS for the local/offline scope on 2026-09-17: 514 tests, Ruff, mypy and whitespace checks pass. The Stage 10 report records the evidence and limitations.
 
 ## Stage 11 — Evaluations and reliability hardening
 
@@ -190,7 +191,9 @@ Stages are capability gates, not calendar estimates. A later stage begins only w
 
 ## Immediate next milestone
 
-Stage 9 provides exact, one-use, revalidated approval against an offline fixture write.
-Recommend Stage 10 reliability, recovery, and audit-query foundations. Production
-authentication, external-effect reconciliation, and real connector safety remain
-unproven. No Stage 10 implementation or production write integration has begun.
+Stage 10 adds tested local durability, fixture reconciliation and scoped audit reads.
+Recommend a separately authorized Stage 11 reliability/inspection-hardening scope:
+operator recovery contracts, coordinated restore drills, query scale, and a read-only
+local inspection surface over canonical data. Production authentication, real connector
+safety, power-loss reliability and distributed takeover remain unproven. Stage 11 has
+not started; no production write integration has been added.

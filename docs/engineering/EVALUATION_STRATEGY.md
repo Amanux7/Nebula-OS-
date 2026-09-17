@@ -1,5 +1,22 @@
 # Agent Evaluation Strategy
 
+## Stage 10 reliability evidence
+
+The offline reliability slice evaluates explicit crash boundaries, not agent
+intelligence. Required observations are: zero duplicate fixture effects after
+recovery, no success invented for an unknown outcome, no restored approval reuse,
+unchanged deadline/budget on reopen, and visible reconciliation lineage. Known
+remote failure differs from unknown. Receipt repair is idempotent and does not
+grant Task acceptance.
+
+The suite establishes deterministic scenario coverage, not a statistical production
+reliability rate. Future experiments must report recovery success rate, duplicate
+external-action rate, unknown-outcome rate, time to reconcile, corruption-detection
+rate, and crash-window coverage with denominators and workload. Physical power
+loss, long-running concurrency/load, backup restores and real connector contracts
+remain unmeasured. See the Stage 10 report; do not infer production SLOs from its
+passing test count.
+
 ## Stage 9 consequential-action governance
 
 Stage 9 evaluates deterministic authorization, not whether a model chooses desirable

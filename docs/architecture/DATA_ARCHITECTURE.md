@@ -1,5 +1,27 @@
 # Data Architecture
 
+## Stage 10 implemented persistence
+
+SQLite is selected by ADR-013 for local durability. Explicit migrations
+001_domain.sql and 002_runtime.sql record checksummed versions; upgrading is a
+separate trusted-host operation. Domain rows and audit have workspace foreign keys.
+Canonical runtime collections have typed keys, scoped lineage links, schema and
+entity versions, SQL CAS revisions, and retention classification. The codec uses
+an explicit record allowlist and rejects unknown fields/types/schemas, invalid
+enums, malformed JSON, and relational/payload identity mismatches. No pickle.
+
+Canonical scope includes approvals/intents/claims/receipts, all runtime and
+orchestration records, graph versions/active pointer, Knowledge versions/chunks/
+EvidencePacks, Memory candidates/entries/context packs, and messages/handoffs.
+Lexical search and directory projections are rebuilt; executors are explicitly
+rebound by trusted host code. Each test uses a temporary local file.
+
+The independent fixture remote database is deliberately outside canonical
+transactions. Local rollback cannot undo its effect. Application restore, remote
+ledger restore, encryption, access control, retention periods, deletion propagation,
+and measured RPO/RTO remain production prerequisites. Sensitive exact payloads stay
+in protected canonical records; generic audit views expose bounded metadata only.
+
 ## Stage 9 consequential-action governance
 
 RuntimeStore now retains exact immutable intents and captured policies, requests,

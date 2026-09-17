@@ -1,5 +1,24 @@
 # Open Questions
 
+## Stage 10 resolutions and remaining questions
+
+ADR-013 selects SQLite for the local durability/recovery proof; runtime and
+cross-subsystem persistence are now implemented, not merely proposed. Unknown
+consequential outcomes remain blocked, and approved claim identity survives restart.
+See [Stage 10 evidence](../STAGE_10_REPORT.md) before interpreting older stage targets.
+
+Still unresolved: authenticated recovery operators; quiescence/fencing for live
+worker takeover; a bounded authorized redispatch protocol after authoritative
+non-execution evidence; connector-specific reconciliation of previously unknown
+receipts without rewriting history; recovery after a lost model response; encrypted
+storage; coordinated backup/remote-ledger restores; retention/legal-hold/deletion
+semantics; query pagination and store scale; measured RPO/RTO and concurrency soak.
+
+A future product-inspection surface should use scoped query services, not raw SQL,
+and clearly show unknown outcomes. No UI or Stage 11 implementation is authorized
+by this refinement. Reliability hardening and operator runbooks should precede real
+production connectors or autonomous capability expansion.
+
 ## Stage 9 consequential-action governance
 
 ADR-012 resolves exact intent/digest binding, Levels 0–3 policy, explicit local reviewer

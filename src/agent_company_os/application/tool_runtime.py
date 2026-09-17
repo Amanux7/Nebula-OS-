@@ -424,6 +424,50 @@ class ToolRuntimeService:
             )
             return self._observe(run, action, data)
 
+    def reconcile_receipt(self, receipt: ToolReceipt) -> AgentRun:
+        """Apply already durable evidence locally; never dispatch or reopen parents."""
+        invocation = receipt.invocation
+        with self.store.atomic():
+            run = self.store.get_run(invocation.workspace_id, invocation.run_id)
+            if receipt not in self.store.tool_receipts(run.workspace_id, run.id):
+                raise InvariantViolation("recovery_requires_canonical_receipt")
+            if self.governance is not None:
+                self.governance.consumed(invocation)
+            if (
+                run.status is not AgentRunStatus.RUNNING
+                or not run.working_state.invocation_pending
+                or run.version != invocation.run_version
+                or self.clock.now() >= run.deadline
+            ):
+                return run
+            try:
+                if self._parents(run) != invocation.parent_versions:
+                    return run
+                current = self.registry.resolve(run.workspace_id, invocation.tool_version.grant)
+                if current.revision != invocation.registry_revision:
+                    return run
+            except (ModelFailure, ToolFailure):
+                return run
+            action = self.store.action(run.workspace_id, invocation.action_id)
+            updated = self._observe(
+                run,
+                action,
+                ToolObservationData(
+                    receipt.id,
+                    invocation.tool_version.definition.id,
+                    invocation.tool_version.version,
+                    invocation.error_code,
+                    self.receipt_facts(receipt)[:5],
+                    receipt.output.notes if receipt.output else "",
+                ),
+            )
+            self._event(
+                updated,
+                EventType.RECOVERY_PARENT_RECONCILED,
+                (("tool_invocation_id", str(invocation.id)), ("tool_receipt_id", str(receipt.id))),
+            )
+            return updated
+
     def _approval_transition(self, run: AgentRun, status: AgentRunStatus) -> AgentRun:
         updated = run.evolve(at=self.clock.now(), status=status)
         transition = StateTransition(

@@ -11,7 +11,7 @@ scoped capabilities, and evidence behind every accepted result.
 
 > **AI for judgment. Software for guarantees.**
 
-**Current milestone: Stage 9 — Human Approval and Consequential Action Governance.** The
+**Current milestone: Stage 10 — Durable Recovery and Audit Foundations.** The
 repository implements a deterministic domain foundation, a bounded single-agent
 runtime, controlled read-only tools, source-aware Knowledge, reviewed scoped Memory,
 replaceable orchestration, and governed point-to-point communication with explicit
@@ -19,6 +19,9 @@ handoffs and reference re-authorization. A versioned organization now provides
 department, role, and capability discovery with explicit routing restrictions.
 Exact action intents, single-use human approvals, and bounded autonomy now govern
 one offline write-style fixture, with current-state revalidation before dispatch.
+SQLite-backed canonical services now preserve claims, approvals, receipts, runtime
+state and cross-subsystem history across restart. Deterministic recovery reconciles
+known fixture outcomes without redispatch and leaves unknown outcomes blocked.
 It is an early-stage engineering foundation,
 not a deployed autonomous company or a production-ready AI service.
 
@@ -85,7 +88,9 @@ cannot grant permissions, bypass domain invariants, or certify its own success.
 | Failure handling | Timeouts, budgets, duplicate-invocation protection, stale-result rejection, and atomic rollback |
 | Organization | Immutable graph versions, effective memberships, governed reporting, registry discovery, and department policy |
 | Governance | Exact payload fingerprints, explicit reviewers, expiry/revocation, one-use approval, and bounded Level 3 fixture execution |
-| Verification | 444 passing tests at the Stage 9 gate, plus formatting, lint, and strict type checks |
+| Durable recovery | Shared SQLite transactions, explicit migrations, durable dispatch claims, independent fixture ledger, restart classification and receipt reconciliation |
+| Audit queries | Workspace-scoped timelines, approval/invocation views, and structural Goal-to-receipt lineage |
+| Verification | 514 passing offline tests; Ruff formatting/lint, mypy, and whitespace checks pass. See the [Stage 10 report](docs/STAGE_10_REPORT.md) |
 
 The only supplied agent type is the **Research Brief Agent**. It can operate on
 approved supplied facts or receive an immutable definition upgrade granting the
@@ -93,6 +98,30 @@ two fixture tools and/or a fixed knowledge-source allowlist. Its model responses
 scripted; no live LLM provider is wired in.
 
 ## Architecture
+
+### Local durability and inspection
+
+Stage 10 is an offline backend proof, not a product dashboard. The independent
+fixture ledger represents an external system; no real message is sent. Run its
+restart demonstrations and safe audit-query tests locally:
+
+```powershell
+python -m pytest -q tests/test_recovery.py tests/test_durable_faults.py
+python -m pytest -q tests/test_durable_subsystems.py tests/test_durable_audit_security.py
+```
+
+For host composition, call `migrate_database(path)` explicitly, then construct
+`SqliteStoreGroup(path)`. Supply its matching store properties to the existing
+services and explicitly bind trusted executors to its registry. Close the group
+after use. Do not mix in-memory stores into a durable transaction graph.
+`AuditQueryService(group.runtime, orchestration=group.orchestration)` exposes
+Goal/Task/AgentRun/intent timelines, task approvals, execution invocations and
+Goal-to-receipt traces. Every query requires workspace scope. It is a safe seam
+for a separately scoped future inspection UI; the landing page is not the platform.
+
+Recovery never automatically dispatches: a missing receipt means uncertainty,
+not permission to retry. See [ADR-013](docs/architecture/ADR/ADR-013-durable-state-recovery-and-audit.md)
+and the [Stage 10 report](docs/STAGE_10_REPORT.md) for tested guarantees and limits.
 
 The implemented architecture is a **modular Python application**, not a microservice
 deployment. These are logical responsibilities, not separately deployed services.
@@ -115,15 +144,15 @@ flowchart TD
     agentRuntime -->|"KnowledgeRuntimePort"| knowledge["KnowledgeService"]
     agentRuntime -->|"MemoryRuntimePort"| memory["MemoryService"]
     toolRuntime -->|"Resolve exact grants"| registry["ToolRegistry"]
-    toolRuntime -->|"ToolExecutor"| fixtures["Read-only fixture tools"]
-    domainService -->|"DomainStore"| state["In-memory domain state"]
-    agentRuntime -->|"RuntimeStore"| history["In-memory runtime records"]
+    toolRuntime -->|"ToolExecutor"| fixtures["Offline read and governed write fixtures"]
+    domainService -->|"DomainStore"| state["Domain state: in-memory or SQLite"]
+    agentRuntime -->|"RuntimeStore"| history["Runtime records: in-memory or SQLite"]
     toolRuntime -->|"Claims and receipts"| history
     knowledge -->|"EvidencePack"| history
     memory -->|"MemoryContextPack"| history
-    orchestrator -->|"Plans, delegations, lineage"| orchestrationHistory["In-memory orchestration records"]
-    orchestrationHistory ---|"Shared rollback boundary"| state
-    history ---|"Shared rollback boundary"| state
+    orchestrator -->|"Plans, delegations, lineage"| orchestrationHistory["Orchestration records: in-memory or SQLite"]
+    orchestrationHistory ---|"Shared transaction boundary"| state
+    history ---|"Shared transaction boundary"| state
 ~~~
 
 ### Separation of responsibilities
@@ -131,7 +160,7 @@ flowchart TD
 - **Domain:** legal lifecycles, entity relationships, workspace scope, and historical integrity.
 - **Application:** domain use cases, agent coordination, context assembly, grounding, and tool execution policy.
 - **Ports:** typed seams for clocks, identifiers, models, tools, registries, and storage.
-- **Adapters:** in-memory persistence, system/test clocks and IDs, scripted models, and fixture executors.
+- **Adapters:** in-memory and SQLite persistence, system/test clocks and IDs, scripted models, and offline fixture executors.
 
 AgentRuntimeService coordinates decisions; ToolRuntimeService controls capabilities.
 Neither model text nor tool-returned content becomes an authority boundary.
@@ -214,8 +243,8 @@ flowchart LR
 
 Planning is replaceable; the planner cannot create permissions, bypass Task state,
 or certify Goal success. Replanning preserves immutable history and cannot remove
-already materialized work in Stage 6. The implementation is synchronous and in-memory;
-it is not a durable workflow engine, queue, multi-agent chat system, or live-model
+already materialized work in Stage 6. Stage 10 adds local SQLite durability;
+it is not a distributed workflow engine, queue, multi-agent chat system, or live-model
 planner. See [ADR-009](docs/architecture/ADR/ADR-009-replaceable-orchestration-and-delegation.md).
 
 ### Multi-agent communication and handoffs
@@ -238,9 +267,9 @@ blackboard, message broker, external provider, or free-form chat. See
 [ADR-010](docs/architecture/ADR/ADR-010-multi-agent-communication-and-handoffs.md).
 
 The [System Architecture](docs/architecture/SYSTEM_ARCHITECTURE.md) describes the
-broader target design. Its multi-agent communication, organization UI, approval,
-external integration, and production infrastructure layers must not be mistaken for
-implemented services.
+broader target design. Communication and fixture approval are implemented backend
+capabilities; an organization UI, production integrations, and distributed infrastructure
+are not implemented services.
 
 ### Domain vocabulary
 
@@ -402,8 +431,8 @@ repeated-read, and two-tool behavior. No live model or network call is made.
 Run all checks with the virtual environment's Python:
 
 ~~~bash
-python -m ruff format --check src tests
-python -m ruff check src tests
+python -m ruff format --check .
+python -m ruff check .
 python -m mypy
 python -m pytest -q
 git diff --check
@@ -424,7 +453,7 @@ with the commands above; CI repeats the same checks without secrets, paid APIs, 
 models, or external services.
 
 Use the repository's [open pull requests](https://github.com/Amanux7/Nebula-OS-/pulls)
-page to review published changes. The [Stage 9 report](docs/STAGE_9_REPORT.md)
+page to review published changes. The [Stage 10 report](docs/STAGE_10_REPORT.md)
 summarizes the current local implementation, verification results, risks, and deferred work.
 
 The [Stage 7 report](docs/STAGE_7_REPORT.md) records **331 passing tests**, including
@@ -435,6 +464,11 @@ usefulness, or answer quality.
 The Stage 8 gate extends that baseline to 386 passing tests. Stage 9 adds 58 governance
 cases, for **444 passing tests**, including exact approval, organization-aware
 wait/resume, rejection, replay, rollback, and uncertain-outcome scenarios.
+
+Stage 10 extends the suite to **514 passing tests**, including genuine database
+reopening, process-death recovery, independent fixture effects, audit isolation,
+corruption rejection, and competing-worker claims. These are local/offline guarantees,
+not evidence of production-scale operation.
 
 Run the Company Brain scenarios alone with `python -m pytest tests/test_knowledge.py -q`.
 The fictional Aurora Desk corpus demonstrates missing-context recovery, version updates,
@@ -449,7 +483,7 @@ bounded retrieval, and combined knowledge/tool evidence without network calls.
 │   ├── domain/              # Entities, value objects, state and evidence contracts
 │   ├── application/         # Domain, agent, tool, knowledge, memory and orchestration services
 │   ├── ports/               # Typed runtime, strategy, policy, ID and storage boundaries
-│   ├── adapters/            # In-memory stores, deterministic strategies and scripted doubles
+│   ├── adapters/            # SQLite/in-memory stores, migrations and offline fixtures
 │   └── serialization.py     # Explicit domain boundary serialization
 ├── tests/
 │   ├── fixtures/agent_eval/ # Deterministic and adversarial evaluation fixtures
@@ -481,7 +515,8 @@ bounded retrieval, and combined knowledge/tool evidence without network calls.
 | 7 | Multi-agent communication and handoffs | Implemented and verified offline |
 | 8 | Departments, registry, and organization graph | Implemented and verified offline |
 | 9 | Human approval and consequential-action governance | Implemented and verified offline |
-| 10 | Reliability, recovery, and audit-query foundations | Recommended next; not started |
+| 10 | Reliability, recovery, and audit-query foundations | Implemented and verified locally/offline |
+| 11 | Operator control plane, restore drills, and read-only inspection | Next scope; not yet implemented |
 | Later | Observability/approval UI, evaluations, integrations, and production | Deferred pending evidence |
 
 Stages are evidence gates, not release dates. Planning may eventually be deterministic,
@@ -496,8 +531,9 @@ See the [Development Roadmap](docs/engineering/DEVELOPMENT_ROADMAP.md).
 - **No live AI or integrations:** no live model provider, OAuth connector, or MCP runtime.
 - **Knowledge is a lexical baseline:** no embeddings, semantic ranking, automatic
   crawling or generic document parser. Memory and communication are separate governed capabilities.
-- **In-memory persistence:** history disappears on process exit; durable recovery
-  and production retention/deletion policies remain unresolved.
+- **Explicit persistence selection:** in-memory adapters still lose history on exit;
+  SQLite composition survives tested restarts. Production backup/restore, retention,
+  encryption, worker fencing, and distributed guarantees remain unproven.
 - **Cooperative adapters:** async timeouts require nonblocking, cancellation-aware
   executors. The runtime is not a sandbox for hostile Python code.
 - **Provenance is not truth:** receipts establish observed inputs and outputs,
@@ -520,6 +556,7 @@ remain outside model context when future integrations are introduced. Read the
 | Engineering standards | [Principles](docs/engineering/ENGINEERING_PRINCIPLES.md), [testing](docs/engineering/TESTING_STRATEGY.md), [evaluation](docs/engineering/EVALUATION_STRATEGY.md), [observability](docs/engineering/OBSERVABILITY_STRATEGY.md) |
 | Shared terminology | [Glossary](docs/project/GLOSSARY.md), [assumptions](docs/project/ASSUMPTIONS.md), [open questions](docs/project/OPEN_QUESTIONS.md) |
 | Implementation evidence | [Stage 1](docs/STAGE_1_REPORT.md), [Stage 2](docs/STAGE_2_REPORT.md), [Stage 3](docs/STAGE_3_REPORT.md), [Stage 4](docs/STAGE_4_REPORT.md), [Stage 5](docs/STAGE_5_REPORT.md), [Stage 6](docs/STAGE_6_REPORT.md), [Stage 7](docs/STAGE_7_REPORT.md), [Stage 8](docs/STAGE_8_REPORT.md), [Stage 9](docs/STAGE_9_REPORT.md) |
+| Durability evidence | [Stage 10 report](docs/STAGE_10_REPORT.md), [durability and recovery ADR](docs/architecture/ADR/ADR-013-durable-state-recovery-and-audit.md) |
 | Foundation history | [Stage 0](docs/STAGE_0_REPORT.md), [Stage 0.1](docs/STAGE_0_1_REFINEMENT_REPORT.md) |
 
 Key decisions: [architecture principles](docs/architecture/ADR/ADR-001-architecture-principles.md),
@@ -555,7 +592,8 @@ flowchart LR
 
 See the [Stage 8 report](docs/STAGE_8_REPORT.md) for test evidence, exact bounds,
 historical-version behavior, and the complete file inventory. Administration remains
-trusted host code and storage remains in memory.
+trusted host code. Stage 10 additionally preserves graph versions and run pins in
+SQLite; in-memory adapters remain available for fast unit tests.
 
 ## Contributing
 
