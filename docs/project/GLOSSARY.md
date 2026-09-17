@@ -1,5 +1,21 @@
 # Glossary
 
+## Stage 10 terminology
+
+- **SqliteStoreGroup:** one connection/unit of work shared by canonical service adapters.
+- **Dispatch claim:** committed ToolInvocation and governed-intent reservation;
+  not proof of remote execution and not transferable after a worker timeout.
+- **RecoveryCase:** derived reason/outcome classification of durable incomplete work.
+- **RecoveryService:** deterministic classifier and receipt reconciler, not a dispatcher.
+- **RemoteLookup:** connector status evidence: never_received, processed_success,
+  processed_failure, or unknown.
+- **Safe-to-retry:** eligibility evidence requiring fresh authorization, not blanket
+  approval or permission to replay the existing one-use claim.
+- **AuditQueryService:** scoped, deterministic, sanitized timeline and lineage views.
+- **RetentionClass:** operational, audit, sensitive, or ephemeral data category.
+- **ContentTombstone:** future representation of unavailable content while preserving
+  structural identity; no deletion/compliance implementation is implied.
+
 ## Stage 9 consequential-action governance
 
 - **ActionIntent:** exact immutable consequential proposal, bound to actor, ToolVersion,

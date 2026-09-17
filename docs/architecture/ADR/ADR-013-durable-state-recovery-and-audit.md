@@ -2,9 +2,62 @@
 
 ## Status
 
-Accepted storage and recovery direction, 2026-09-12. Implementation is in progress;
-this ADR is not a claim that the Stage 10 completion gate has passed.
+Accepted storage and recovery direction, 2026-09-12. The initial checkpoint was
+incomplete. Local/offline implementation and its Stage 10 gate were verified on
+2026-09-17; this does not certify production or distributed recovery.
 Earlier accepted ADRs remain historical and unchanged.
+
+Implementation evidence added 2026-09-17: the adapter/recovery/audit work described
+below now exists. The original decision and checkpoint context are retained;
+[STAGE_10_REPORT](../../STAGE_10_REPORT.md) records the verified completion verdict.
+
+## Implemented Stage 10 evidence
+
+- Explicit 001/002 migration bootstrap/upgrade and schema-v1 allowlisted JSON;
+  unknown fields/types/schemas, invalid enums, forged keys/scopes and impossible
+  records fail closed. Opening does not migrate.
+- SqliteStoreGroup shares one connection across domain/runtime, governance, Tool
+  registry, orchestration, organization, knowledge, memory and communication.
+  Public typed store guards remain in force. Outer commands read current records
+  under BEGIN IMMEDIATE; changed rows use version/revision predicates and row-count
+  checks. Nested container snapshots provide rollback. Domain application commands
+  include validation and mutation in that shared transaction.
+- ToolInvocation plus GovernedAction reservation is the durable dispatch claim;
+  no separate queue or lease is required. The transaction commits before I/O.
+  ToolReceipt and consumption commit before optional local parent repair.
+- RecoveryService classifies incomplete work and performs remote lookup without a
+  canonical transaction open. Known success/failure produces validated receipt
+  evidence. Unknown stays blocked; existing unknown receipts are not overwritten.
+  Receipt repair is idempotent, does not reopen stale/terminal parents, and does
+  not treat a Tool success as Task/Goal acceptance.
+- Independent fixture SQLite state supports stable keys, payload mismatch rejection,
+  status lookup and abrupt application process loss. The stable key includes the
+  existing deterministic intent identity (intent:ActionId), invocation, workspace
+  and Tool version. It is not a claim of distributed exactly-once behavior.
+- Workspace-scoped audit projections resolve structural lineage and sort by UTC
+  timestamp then EventId. Generic projections omit raw payloads/free-text reasons.
+  Canonical collection retention classes are stored; tombstones remain a model for
+  future governed redaction, not a deletion job or compliance claim.
+- Genuine reopen, a subprocess exiting after remote commit, competing connections,
+  state/audit/receipt failures, corruption, all canonical subsystems and preserved
+  multi-department graph pins/budgets are exercised by the Stage 10 test modules.
+- OrchestrationService.reconcile_child repairs a committed child result without
+  invoking a model or Tool. Same-child/version reconciliation is recorded atomically
+  and is idempotent. Failure accounting derives from canonical child records;
+  execution checks that count even if an earlier parent update was lost to a crash.
+
+### Deliberate implementation limits
+
+The adapter performs bounded full-record reads and validation per outer unit of
+work; it is not tuned for large corpora. In-memory adapters remain unchanged in
+availability and continue serving fast tests. Recovery runs under trusted host
+composition after failed-worker quiescence, not an authenticated operator service.
+It never dispatches. safe_to_retry is evidence eligibility, not reusable approval;
+post-claim redispatch and live-worker fencing require a later explicit protocol.
+Read-only eligibility is less restrictive but never resets an existing claim or
+budget. Missing model responses require explicit intervention, not guessed replay.
+Backups, encryption, physical power loss, hostile database tampering, legal
+retention/deletion, distributed claims and production connectors remain deferred.
 
 ## Context
 

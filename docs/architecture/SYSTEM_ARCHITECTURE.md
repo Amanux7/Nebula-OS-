@@ -1,5 +1,26 @@
 # System Architecture
 
+## Stage 10 durable service composition
+
+`SqliteStoreGroup` supplies domain, runtime, Knowledge, Memory, Organization,
+Orchestration, Communication, and Tool registry adapters on one connection.
+Existing in-memory adapters remain available. Explicit migration precedes opening;
+opening never creates canonical tables. Domain commands now include their reads
+and validation in the same transaction as their writes.
+
+The bounded adapter loads typed canonical records at each outer unit of work and
+writes only changed records with SQL compare-and-swap. Nested immutable-container
+snapshots preserve rollback semantics. This is a local single-writer proof, not
+a scalable ORM, distributed worker system, or event-sourced architecture.
+
+Consequential invocation reservation commits before executor I/O. Recovery only
+classifies or reconciles evidence; it never calls a model or dispatches a write.
+AuditQueryService provides scoped read projections for a future inspection surface.
+No platform UI, landing-page change, or production connector is part of Stage 10.
+See [ADR-013](ADR/ADR-013-durable-state-recovery-and-audit.md) and the
+[Stage 10 evidence report](../STAGE_10_REPORT.md). Earlier stage descriptions below
+retain their historical scope.
+
 ## Stage 9 consequential-action governance
 
 GovernanceService evaluates exact consequential proposals and handles trusted-host

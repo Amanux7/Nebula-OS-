@@ -1,5 +1,28 @@
 # Security and Permissions
 
+## Stage 10 durable threat boundary
+
+SQLite files and service composition are trusted host resources, not hostile-tenant
+security boundaries. Parameterized queries, strict allowlisted decoding, workspace
+foreign keys, identity/lineage validation, immutable history guards and version
+checks detect malformed state and accidental cross-workspace links. They do not
+authenticate an administrator rewriting a complete valid history.
+
+Persisted approval reservation/consumption rejects replay after restart. Receipt
+uncertainty cannot restore approval authority. Current policy still governs normal
+dispatch. Recovery only accepts connector evidence from a trusted host-bound
+adapter; production authenticated recovery principals and connector attestation
+are deferred. Do not expose connector selection or raw store APIs to untrusted
+users. Quiesce the crashed worker before operator recovery; no lease/fencing-based
+takeover is supplied.
+
+Audit queries require workspace and verify subject scope; safe projections omit
+payloads and human free-text reasons. Canonical payloads and the synthetic remote
+ledger still contain sensitive content and need filesystem protection. File
+encryption, tamper-evident archives, stale-backup restoration, deletion/backup
+propagation, and authorization narrower than workspace remain open. Unknown outcome
+is not safe retry; rollback is not external rollback.
+
 ## Stage 9 consequential-action governance
 
 Approval is not permission or a policy bypass. Levels 0/1 cannot execute consequential

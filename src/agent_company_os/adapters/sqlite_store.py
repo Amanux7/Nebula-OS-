@@ -52,9 +52,10 @@ from agent_company_os.domain.ids import (
     Version,
     WorkspaceId,
 )
+from agent_company_os.domain.organization_ids import OrganizationGraphId
 from agent_company_os.domain.task import Task
 from agent_company_os.domain.task_attempt import TaskAttempt
-from agent_company_os.domain.transitions import StateTransition
+from agent_company_os.domain.transitions import StateTransition, SubjectType
 from agent_company_os.domain.workspace import Workspace
 from agent_company_os.ports.tools import ResolvedTool, ToolExecutor
 
@@ -157,6 +158,7 @@ def _version(record: Any) -> int:
 
 class SqliteToolRegistry:
     """Durable configuration; executable implementations are explicitly rebound."""
+
     def __init__(self, group: SqliteStoreGroup) -> None:
         self.group = group
         self._executors: dict[t.ToolGrant, ToolExecutor] = {}
@@ -167,10 +169,24 @@ class SqliteToolRegistry:
             records = self.group._tools
             if version.grant in records:
                 raise InvariantViolation("published_tool_version_immutable")
-            lineage = [r.tool_version for r in records.values() if r.tool_version.definition.id == version.definition.id]
-            if version.version.value != len(lineage) + 1 or (lineage and lineage[0].definition != version.definition):
+            lineage = [
+                r.tool_version
+                for r in records.values()
+                if r.tool_version.definition.id == version.definition.id
+            ]
+            if version.version.value != len(lineage) + 1 or (
+                lineage and lineage[0].definition != version.definition
+            ):
                 raise InvariantViolation("tool_version_lineage")
-            records[version.grant] = t.ToolRegistration(version)
+            previous = next(
+                (r for r in records.values() if r.tool_version.definition == version.definition),
+                None,
+            )
+            records[version.grant] = t.ToolRegistration(
+                version,
+                previous.enabled if previous else True,
+                previous.revision if previous else 0,
+            )
         self._executors[version.grant] = executor
 
     def bind(self, grant: t.ToolGrant, executor: ToolExecutor) -> None:
@@ -181,15 +197,22 @@ class SqliteToolRegistry:
 
     def known(self, workspace_id: WorkspaceId, tool_id: t.ToolId) -> bool:
         with self.group.transaction():
-            return any(r.tool_version.definition.workspace_id == workspace_id and grant.tool_id == tool_id for grant, r in self.group._tools.items())
+            return any(
+                r.tool_version.definition.workspace_id == workspace_id and grant.tool_id == tool_id
+                for grant, r in self.group._tools.items()
+            )
 
     def set_enabled(self, workspace_id: WorkspaceId, tool_id: t.ToolId, enabled: bool) -> None:
+        if type(enabled) is not bool:
+            raise InvariantViolation("tool_enabled_boolean")
         with self.group.transaction():
             if not self.known(workspace_id, tool_id):
                 raise t.ToolFailure(t.ToolError.UNAUTHORIZED)
             for grant, record in tuple(self.group._tools.items()):
                 if grant.tool_id == tool_id:
-                    self.group._tools[grant] = replace(record, enabled=enabled, revision=record.revision + 1)
+                    self.group._tools[grant] = replace(
+                        record, enabled=enabled, revision=record.revision + 1
+                    )
 
     def resolve(self, workspace_id: WorkspaceId, grant: t.ToolGrant) -> ResolvedTool:
         with self.group.transaction():
@@ -384,13 +407,34 @@ class SqliteStoreGroup:
             raise InvariantViolation("cannot_close_active_transaction")
         self.connection.close()
 
+    def _workspace(self, record: Any) -> WorkspaceId:
+        if isinstance(record, o.DelegationAttempt):
+            parent = self.orchestration._delegations.get(record.delegation_id)
+            if parent is None:
+                raise InvariantViolation("delegation_attempt_parent_missing")
+            return parent.workspace_id
+        return _scope(record)
+
     @contextmanager
     def transaction(self) -> Iterator[None]:
         with self._lock:
             if self._depth:
+                # Records are immutable; copying containers gives nested commands
+                # savepoint semantics even when the caller catches a domain error.
+                snapshot = [
+                    (d.owner, d.attribute, getattr(d.owner, d.attribute).copy())
+                    for d in (*self._domain.values(), *self._collections.values())
+                ] + [
+                    (self.domain, name, getattr(self.domain, name).copy())
+                    for name in ("_events", "_transitions", "_event_ids", "_transition_ids")
+                ]
                 self._depth += 1
                 try:
                     yield
+                except BaseException:
+                    for owner, attribute, value in snapshot:
+                        setattr(owner, attribute, value)
+                    raise
                 finally:
                     self._depth -= 1
                 return
@@ -418,22 +462,41 @@ class SqliteStoreGroup:
         self.domain._event_ids, self.domain._transition_ids = set(), set()
         before_domain: dict[Any, Any] = {}
         for row in self.connection.execute(
-            "SELECT kind,id,workspace_id,version,status,created_at,updated_at,payload FROM domain_records ORDER BY rowid"
+            "SELECT kind,id,workspace_id,version,status,created_at,updated_at,payload,"
+            "goal_id,task_id,execution_id FROM domain_records ORDER BY rowid"
         ):
-            kind, identity, workspace, version, status, created, updated, payload = row
+            (
+                kind,
+                identity,
+                workspace,
+                version,
+                status,
+                created,
+                updated,
+                payload,
+                goal_id,
+                task_id,
+                execution_id,
+            ) = row
             if kind not in self._domain:
                 raise InvariantViolation("unknown_durable_record_type")
             descriptor = self._domain[kind]
             record = decode_record(payload, descriptor.record_type)
             if (
                 str(record.id),
-                str(_scope(record)),
+                str(self._workspace(record)),
                 record.version.value,
                 record.status.value,
                 record.created_at.isoformat(),
                 record.updated_at.isoformat(),
             ) != (identity, workspace, version, status, created, updated):
                 raise InvariantViolation("durable_row_payload_mismatch")
+            if (
+                str(record.goal_id) if hasattr(record, "goal_id") else None,
+                str(record.task_id) if isinstance(record, TaskAttempt) else None,
+                str(record.execution_id) if isinstance(record, TaskAttempt) else None,
+            ) != (goal_id, task_id, execution_id):
+                raise InvariantViolation("durable_lineage_payload_mismatch")
             getattr(descriptor.owner, descriptor.attribute)[record.id] = record
             before_domain[(kind, identity)] = (version, payload)
         before_audit: set[Any] = set()
@@ -446,8 +509,11 @@ class SqliteStoreGroup:
             occurred,
             payload,
         ) in self.connection.execute(
-            "SELECT kind,id,workspace_id,subject_kind,subject_id,occurred_at,payload FROM domain_audit ORDER BY rowid"
+            "SELECT kind,id,workspace_id,subject_kind,subject_id,occurred_at,payload "
+            "FROM domain_audit ORDER BY rowid"
         ):
+            if kind not in {"event", "transition"}:
+                raise InvariantViolation("unknown_durable_audit_type")
             audit = (
                 decode_record(payload, Event)
                 if kind == "event"
@@ -479,14 +545,16 @@ class SqliteStoreGroup:
             retention,
             payload,
         ) in self.connection.execute(
-            "SELECT collection,record_key,schema_version,workspace_id,revision,entity_version,retention,payload FROM canonical_records ORDER BY rowid"
+            "SELECT collection,record_key,schema_version,workspace_id,revision,"
+            "entity_version,retention,payload FROM canonical_records ORDER BY rowid"
         ):
             if name not in self._collections or schema != 1:
                 raise InvariantViolation("unknown_durable_record_type")
             descriptor = self._collections[name]
             key = decode_value(key_json, descriptor.key_type)
             record = decode_value(payload, descriptor.record_type)
-            if (str(_scope(record)), _version(record), retention) != (
+            self._validate_key(name, key, record, descriptor.sequence)
+            if (str(self._workspace(record)), _version(record), retention) != (
                 workspace,
                 version,
                 descriptor.retention,
@@ -502,7 +570,136 @@ class SqliteStoreGroup:
             before_records[(name, key_json)] = (revision, payload)
         if self.connection.execute("PRAGMA foreign_key_check").fetchone() is not None:
             raise InvariantViolation("durable_foreign_key_corruption")
+        self._validate_relationships()
         return before_domain, before_records, before_audit
+
+    def _validate_relationships(self) -> None:
+        """Validate cross-record identity, not just individually valid JSON objects."""
+        records: list[Any] = [*self.domain._events, *self.domain._transitions]
+        for descriptor in (*self._domain.values(), *self._collections.values()):
+            container = getattr(descriptor.owner, descriptor.attribute)
+            records.extend(container if descriptor.sequence else container.values())
+        scopes: dict[OpaqueId, WorkspaceId] = {}
+        for record in records:
+            identity = (
+                record.intent.id
+                if isinstance(record, g.GovernedAction)
+                else record.definition.id
+                if isinstance(record, a.AgentDefinitionVersion)
+                else getattr(record, "id", None)
+            )
+            if isinstance(identity, OpaqueId):
+                scope = self._workspace(record)
+                if identity in scopes and scopes[identity] != scope:
+                    raise InvariantViolation("durable_identity_workspace_collision")
+                scopes[identity] = scope
+
+        def references(value: Any) -> Iterator[OpaqueId]:
+            if isinstance(value, OpaqueId):
+                yield value
+            elif is_dataclass(value):
+                for field in fields(value):
+                    yield from references(getattr(value, field.name))
+            elif isinstance(value, tuple):
+                for item in value:
+                    yield from references(item)
+
+        required = (
+            WorkspaceId,
+            GoalId,
+            TaskId,
+            TaskAttemptId,
+            ExecutionId,
+            a.AgentRunId,
+            a.ActionId,
+            t.ToolInvocationId,
+            g.ActionIntentId,
+        )
+        subject_ids = {
+            SubjectType.WORKSPACE: WorkspaceId,
+            SubjectType.GOAL: GoalId,
+            SubjectType.TASK: TaskId,
+            SubjectType.TASK_ATTEMPT: TaskAttemptId,
+            SubjectType.EXECUTION: ExecutionId,
+            SubjectType.AGENT_RUN: a.AgentRunId,
+            SubjectType.KNOWLEDGE_SOURCE: k.KnowledgeSourceId,
+            SubjectType.MEMORY_CANDIDATE: m.MemoryCandidateId,
+            SubjectType.MEMORY_ENTRY: m.MemoryEntryId,
+            SubjectType.ORCHESTRATION_RUN: o.OrchestrationRunId,
+            SubjectType.ORCHESTRATION_PLAN: o.OrchestrationPlanId,
+            SubjectType.DELEGATION: o.DelegationId,
+            SubjectType.MESSAGE_THREAD: c.MessageThreadId,
+            SubjectType.AGENT_MESSAGE: c.AgentMessageId,
+            SubjectType.HANDOFF: c.HandoffId,
+            SubjectType.ORGANIZATION_GRAPH: OrganizationGraphId,
+        }
+        for record in records:
+            scope = self._workspace(record)
+            if isinstance(record, (Event, StateTransition)):
+                subject = subject_ids[record.subject_type](record.subject_id)
+                if scopes.get(subject) != scope:
+                    raise InvariantViolation("durable_audit_subject_binding")
+            for reference in references(record):
+                actual = scopes.get(reference)
+                if actual is not None and actual != scope:
+                    raise InvariantViolation("durable_cross_workspace_reference")
+                if actual is None and isinstance(reference, required):
+                    raise InvariantViolation("durable_parent_missing")
+        for run in self.runtime._runs.values():
+            attempt = self.domain._attempts[run.task_attempt_id]
+            task = self.domain._tasks[run.task_id]
+            definition = run.definition_version
+            if (
+                attempt.task_id != run.task_id
+                or attempt.execution_id != run.execution_id
+                or task.goal_id != run.goal_id
+                or self.runtime._definitions.get((definition.definition.id, definition.version))
+                != definition
+            ):
+                raise InvariantViolation("durable_run_lineage")
+        for receipt in self.runtime._tool_receipts.values():
+            if self.runtime._tool_invocations.get(receipt.invocation.id) != receipt.invocation:
+                raise InvariantViolation("durable_receipt_invocation_mismatch")
+        for record in self.runtime._governed.values():
+            if record.invocation_id is not None:
+                invocation = self.runtime._tool_invocations[record.invocation_id]
+                if (
+                    invocation.action_id != record.intent.action_id
+                    or invocation.run_id != record.intent.run_id
+                ):
+                    raise InvariantViolation("durable_approval_claim_binding")
+
+    @staticmethod
+    def _validate_key(name: str, key: Any, record: Any, sequence: bool) -> None:
+        if sequence:
+            return
+        expected: Any
+        if name == "tool_registry":
+            expected = record.tool_version.grant
+        elif name == "definitions":
+            expected = (record.definition.id, record.version)
+        elif name in {"policies", "graphs"}:
+            expected = record.workspace_id
+        elif name == "governance":
+            expected = record.intent.id
+        elif name == "source_versions":
+            expected = (record.source.id, record.source.version)
+        elif name == "chunks":
+            if not record:
+                raise InvariantViolation("empty_canonical_chunks")
+            expected = (record[0].source_id, record[0].source_version)
+            if any((item.source_id, item.source_version) != expected for item in record):
+                raise InvariantViolation("durable_chunk_binding")
+        elif name == "graph_versions":
+            expected = (record.workspace_id, record.version)
+        elif name == "plans":
+            expected = (record.id, record.version)
+        elif name == "materializations":
+            expected = (record.plan_id, record.plan_version)
+        else:
+            expected = record.id
+        if key != expected:
+            raise InvariantViolation("durable_record_key_mismatch")
 
     def _flush(
         self, before_domain: dict[Any, Any], before: dict[Any, Any], audit_ids: set[Any]
@@ -517,7 +714,8 @@ class SqliteStoreGroup:
                 self.fault("state_write")
                 if old:
                     cursor = self.connection.execute(
-                        "UPDATE domain_records SET version=?,status=?,updated_at=?,payload=? WHERE kind=? AND id=? AND version=?",
+                        "UPDATE domain_records SET version=?,status=?,updated_at=?,payload=? "
+                        "WHERE kind=? AND id=? AND version=?",
                         (
                             record.version.value,
                             record.status.value,
@@ -531,10 +729,12 @@ class SqliteStoreGroup:
                         raise InvariantViolation("durable_version_conflict")
                 else:
                     self.connection.execute(
-                        "INSERT INTO domain_records(kind,id,workspace_id,version,status,created_at,updated_at,payload,goal_id,task_id,execution_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                        "INSERT INTO domain_records(kind,id,workspace_id,version,status,"
+                        "created_at,updated_at,payload,goal_id,task_id,execution_id) "
+                        "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                         (
                             *identity,
-                            str(_scope(record)),
+                            str(self._workspace(record)),
                             record.version.value,
                             record.status.value,
                             record.created_at.isoformat(),
@@ -581,17 +781,21 @@ class SqliteStoreGroup:
                     if descriptor.sequence:
                         raise InvariantViolation("durable_history_immutable")
                     cursor = self.connection.execute(
-                        "UPDATE canonical_records SET payload=?,entity_version=?,revision=revision+1 WHERE collection=? AND record_key=? AND revision=?",
+                        "UPDATE canonical_records SET payload=?,entity_version=?,"
+                        "revision=revision+1 "
+                        "WHERE collection=? AND record_key=? AND revision=?",
                         (payload, _version(record), *identity, old[0]),
                     )
                     if cursor.rowcount != 1:
                         raise InvariantViolation("durable_version_conflict")
                 else:
                     self.connection.execute(
-                        "INSERT INTO canonical_records(collection,record_key,schema_version,workspace_id,revision,entity_version,retention,payload) VALUES (?,?,1,?,1,?,?,?)",
+                        "INSERT INTO canonical_records(collection,record_key,schema_version,"
+                        "workspace_id,revision,entity_version,retention,payload) "
+                        "VALUES (?,?,1,?,1,?,?,?)",
                         (
                             *identity,
-                            str(_scope(record)),
+                            str(self._workspace(record)),
                             _version(record),
                             descriptor.retention,
                             payload,
@@ -625,5 +829,5 @@ class SqliteStoreGroup:
                 if target is not None and target != identity:
                     self.connection.execute(
                         "INSERT OR IGNORE INTO canonical_links VALUES (?,?,?,?,?)",
-                        (str(_scope(record)), *identity, *target),
+                        (str(self._workspace(record)), *identity, *target),
                     )

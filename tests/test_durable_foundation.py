@@ -23,7 +23,8 @@ def workspace() -> Workspace:
 def insert_workspace(connection: sqlite3.Connection) -> None:
     record = workspace()
     connection.execute(
-        "INSERT INTO domain_records(kind,id,workspace_id,version,status,created_at,updated_at,payload) "
+        "INSERT INTO domain_records(kind,id,workspace_id,version,status,"
+        "created_at,updated_at,payload) "
         "VALUES ('workspace',?,?,1,'active',?,?,?)",
         (
             str(record.id),
@@ -95,7 +96,8 @@ def test_foreign_lineage_is_not_insertable(tmp_path: Path) -> None:
     connection = open_database(path)
     with pytest.raises(sqlite3.IntegrityError):
         connection.execute(
-            "INSERT INTO domain_records(kind,id,workspace_id,version,status,created_at,updated_at,payload) "
+            "INSERT INTO domain_records(kind,id,workspace_id,version,status,"
+            "created_at,updated_at,payload) "
             "VALUES ('goal','g','missing',1,'draft','t','t','{}')"
         )
     connection.close()

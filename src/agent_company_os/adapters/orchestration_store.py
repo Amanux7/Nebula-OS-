@@ -26,6 +26,10 @@ from agent_company_os.ports.runtime_store import RuntimeStore
 
 
 class InMemoryOrchestrationStore:
+    def runs(self, workspace_id: WorkspaceId) -> tuple[OrchestrationRun, ...]:
+        self.runtime.domain.get_workspace(workspace_id)
+        return tuple(r for r in self._runs.values() if r.workspace_id == workspace_id)
+
     def __init__(self, runtime: RuntimeStore) -> None:
         self.runtime = runtime
         self._runs: dict[OrchestrationRunId, OrchestrationRun] = {}

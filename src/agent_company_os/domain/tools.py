@@ -158,6 +158,10 @@ class ToolRegistration:
     enabled: bool = True
     revision: int = 0
 
+    def __post_init__(self) -> None:
+        if type(self.enabled) is not bool or type(self.revision) is not int or self.revision < 0:
+            raise InvariantViolation("tool_registration_state")
+
 
 class ToolInvocationStatus(StrEnum):
     RUNNING = "running"

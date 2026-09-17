@@ -65,7 +65,8 @@ class RecoverableFixtureExecutor:
         self.connection.execute("BEGIN IMMEDIATE")
         try:
             old = self.connection.execute(
-                "SELECT payload_digest,status,output_json FROM fixture_effects WHERE idempotency_key=?",
+                "SELECT payload_digest,status,output_json FROM fixture_effects "
+                "WHERE idempotency_key=?",
                 (key,),
             ).fetchone()
             if old is None:

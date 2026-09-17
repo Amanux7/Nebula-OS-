@@ -9,6 +9,7 @@ import math
 from dataclasses import fields, is_dataclass
 from datetime import datetime
 from enum import Enum
+from functools import cache
 from types import UnionType
 from typing import Any, Literal, TypeAliasType, get_args, get_origin, get_type_hints
 
@@ -206,6 +207,11 @@ def _encode(value: object) -> object:
     raise _invalid()
 
 
+@cache
+def _hints(expected: type[Any]) -> dict[str, Any]:
+    return get_type_hints(expected, localns={kind.__name__: kind for kind in _RECORD_TYPES})
+
+
 def _decode(value: object, expected: Any) -> Any:
     """Type hints describe a fixed allowlisted schema, not caller-selected types."""
     if isinstance(expected, TypeAliasType):
@@ -265,7 +271,7 @@ def _decode(value: object, expected: Any) -> Any:
         names = {field.name for field in fields(expected)}
         if set(value) != names:
             raise _invalid()
-        hints = get_type_hints(expected, localns={kind.__name__: kind for kind in _RECORD_TYPES})
+        hints = _hints(expected)
         return expected(**{name: _decode(value[name], hints[name]) for name in names})
     raise _invalid()
 

@@ -1,5 +1,25 @@
 # Observability Strategy
 
+## Stage 10 recovery and audit queries
+
+Canonical recovery_detected, recovery_lookup, recovery_receipt_reconciled and
+recovery_parent_reconciled Events expose invocation/action/execution IDs and
+normalized reasons, without exact fixture messages. Goal timelines correlate
+domain/runtime history; supplying the orchestration store adds plan/delegation
+history. Additional scoped event sources can be composed explicitly.
+
+RecoveryService.reliability_snapshot rebuilds bounded counts for detected cases,
+unknown outcomes, reconciled receipts, manual reconciliation, safe-retry candidates,
+blocked unknown-result retry decisions, incomplete AgentRuns and expired unresolved
+claims. Candidate/decision counts are not executed retries. There is no automatic
+recovery dispatcher, so an actual safe-retries counter is not claimed.
+AuditQueryService tracks successful timeline count and cumulative query latency in
+process; these derived measurements reset on restart and never authorize actions.
+
+No telemetry backend or alert delivery is installed. Production query latency,
+recovery duration, restore objectives and operator response targets need measured
+workloads. Sensitive payloads remain excluded from generic query projections.
+
 ## Stage 9 consequential-action governance
 
 Stage 9 Events identify intent creation, approval request/grant/rejection/revocation/

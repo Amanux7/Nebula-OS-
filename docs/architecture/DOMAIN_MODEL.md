@@ -1,5 +1,26 @@
 # Domain Model
 
+## Stage 10 durable recovery semantics
+
+Canonical entity state is directly persisted; Events remain append-only audit
+records, not the source from which all state is replayed. A committed
+ToolInvocation plus its GovernedAction reservation is the dispatch claim.
+No receipt means outcome unknown, even if a worker might have died before I/O.
+A canonical ToolReceipt is independent evidence; a parent transition is not proof
+of an external effect.
+
+RecoveryCase is a derived classification of persisted evidence, not a new mutable
+authorization object. A known receipt may repair a pending AgentRun observation
+once; Task/Execution/Goal completion still uses existing grounded completion rules.
+Expired, cancelled, or changed parents are not reopened. Immutable definitions,
+graph pins, packs, budgets, deadlines, approval expiry and consumption survive reopen.
+
+RetentionClass distinguishes operational, audit, sensitive, and ephemeral data.
+ContentTombstone describes a future unavailable-content marker, not an enabled
+deletion operation. Claims have no transferable lease. Read retry eligibility
+does not authorize redispatch of an existing claim. See ADR-013 and
+[Stage 10](../STAGE_10_REPORT.md) for the exact implemented limits.
+
 ## Stage 9 consequential-action governance
 
 Stage 9 adds immutable ActionIntent, ApprovalPolicy, ApprovalRequest, append-only

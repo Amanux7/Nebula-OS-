@@ -1,5 +1,26 @@
 # Testing Strategy
 
+## Stage 10 durability gate
+
+Fast Stage 1–9 tests retain in-memory adapters. SQLite integration tests use
+temporary files, close connections, discard service graphs, and reopen canonical
+state. The independent fixture ledger survives separately. A subprocess test exits
+with os._exit after its remote commit, before a local receipt, then reconstructs
+services and reconciles without dispatch.
+
+Coverage includes migrations/upgrade, strict codec corruption, workspace isolation,
+SQL CAS, two independent worker connections competing for approval resume/claim,
+nested rollback, state/audit/receipt failures, crash windows A–D, known/unknown remote
+status, consumed/revoked/expired approvals, preserved budgets/deadlines, every
+canonical subsystem, multi-department wait/resume, and ordered sanitized audit.
+Read-only retry eligibility is tested separately from consequential uncertainty.
+The exact command outputs and limitations are in [Stage 10](../STAGE_10_REPORT.md).
+
+Run: python -m ruff format --check ., python -m ruff check ., python -m mypy,
+python -m pytest -q, and git diff --check. No network server, credentials, or paid
+API is required. These tests are not power-loss, filesystem-failure, distributed
+consensus, or production recovery-SLO certification.
+
 ## Stage 9 consequential-action governance
 
 tests/test_governance.py adds 58 offline cases covering Levels 0–3, disabled Level 4,

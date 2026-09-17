@@ -43,7 +43,9 @@ def test_governance_true_reopen(tmp_path, clock, monkeypatch, decision):
     path = tmp_path / "runtime.sqlite"
     migrate_database(path)
     graph = SqliteStoreGroup(path)
-    monkeypatch.setattr("test_governance.InMemoryRuntimeStore", lambda domain: graph.runtime)
+    monkeypatch.setattr(
+        "test_governance.InMemoryRuntimeStore", lambda domain, selected=graph.runtime: selected
+    )
     domain = DomainService(graph.domain, clock, DeterministicIdGenerator())
     harness = GovernanceHarness(domain, clock)
     harness.drive()
@@ -54,6 +56,7 @@ def test_governance_true_reopen(tmp_path, clock, monkeypatch, decision):
     before = harness.record()
     run = graph.runtime.get_run(harness.workspace.id, harness.run.id)
     graph.close()
+    monkeypatch.undo()
     del harness, domain, graph
     reopened = SqliteStoreGroup(path)
     assert reopened.runtime.governed_action(run.workspace_id, before.intent.id) == before
@@ -65,7 +68,9 @@ def test_receipt_consumption_reopen(tmp_path, clock, monkeypatch):
     path = tmp_path / "receipts.sqlite"
     migrate_database(path)
     graph = SqliteStoreGroup(path)
-    monkeypatch.setattr("test_governance.InMemoryRuntimeStore", lambda domain: graph.runtime)
+    monkeypatch.setattr(
+        "test_governance.InMemoryRuntimeStore", lambda domain, selected=graph.runtime: selected
+    )
     harness = GovernanceHarness(
         DomainService(graph.domain, clock, DeterministicIdGenerator()), clock
     )
@@ -74,6 +79,7 @@ def test_receipt_consumption_reopen(tmp_path, clock, monkeypatch):
     harness.resume()
     record, receipts, run = harness.record(), harness.receipts(), harness.run
     graph.close()
+    monkeypatch.undo()
     del harness, graph
     reopened = SqliteStoreGroup(path)
     assert reopened.runtime.governed_action(run.workspace_id, record.intent.id).consumed

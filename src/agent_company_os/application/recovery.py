@@ -28,17 +28,26 @@ from agent_company_os.domain.tools import (
 from agent_company_os.domain.transitions import SubjectType
 from agent_company_os.ports.clock import Clock
 from agent_company_os.ports.ids import IdGenerator
+from agent_company_os.ports.orchestration import OrchestrationStore
 from agent_company_os.ports.recovery import RecoveryConnector
 from agent_company_os.ports.runtime_store import RuntimeStore
 
 
 class RecoveryService:
     def __init__(
-        self, store: RuntimeStore, tools: ToolRuntimeService, clock: Clock, ids: IdGenerator
+        self,
+        store: RuntimeStore,
+        tools: ToolRuntimeService,
+        clock: Clock,
+        ids: IdGenerator,
+        orchestration: OrchestrationStore | None = None,
     ) -> None:
         if tools.store is not store:
             raise InvariantViolation("recovery_store_binding")
         self.store, self.tools, self.clock, self.ids = store, tools, clock, ids
+        if orchestration is not None and orchestration.runtime is not store:
+            raise InvariantViolation("recovery_orchestration_binding")
+        self.orchestration = orchestration
 
     def classify(self, workspace: WorkspaceId) -> tuple[RecoveryCase, ...]:
         cases: list[RecoveryCase] = []
@@ -59,16 +68,18 @@ class RecoveryService:
                     reason = (
                         RecoveryReason.MANUAL_REVIEW
                     )  # Lost model result is not guessed/replayed.
-                cases.append(
-                    RecoveryCase(workspace, "agent_run", str(run.id), reason, "not_executed")
+                # An active parent is not evidence that its children were never dispatched.
+                outcome = (
+                    "outcome_unknown"
+                    if self.store.tool_invocations(workspace, run.id)
+                    else "not_executed"
                 )
+                cases.append(RecoveryCase(workspace, "agent_run", str(run.id), reason, outcome))
                 for kind, identity in (
                     ("task_attempt", run.task_attempt_id),
                     ("execution", run.execution_id),
                 ):
-                    cases.append(
-                        RecoveryCase(workspace, kind, str(identity), reason, "not_executed")
-                    )
+                    cases.append(RecoveryCase(workspace, kind, str(identity), reason, outcome))
             for record in self.store.governed_actions(workspace):
                 if record.invocation_id is None:
                     reason = RecoveryReason.AWAITING_APPROVAL
@@ -129,6 +140,31 @@ class RecoveryService:
                                 "observed_success" if receipt.output else "observed_failure",
                             )
                         )
+            represented = {(case.subject_type, case.subject_id) for case in cases}
+            for kind, records in (
+                ("execution", self.store.domain.executions(workspace)),
+                ("task_attempt", self.store.domain.task_attempts(workspace)),
+                (
+                    "orchestration_run",
+                    self.orchestration.runs(workspace) if self.orchestration else (),
+                ),
+            ):
+                for item in records:
+                    if (kind, str(item.id)) not in represented and item.status.value in {
+                        "running",
+                        "waiting",
+                        "planning",
+                        "created",
+                    }:
+                        cases.append(
+                            RecoveryCase(
+                                workspace,
+                                kind,
+                                str(item.id),
+                                RecoveryReason.RESUME_LOCAL,
+                                "outcome_unknown",
+                            )
+                        )
         return tuple(sorted(set(cases), key=lambda case: (case.subject_type, case.subject_id)))
 
     def _event(
@@ -150,6 +186,92 @@ class RecoveryService:
                     ("reason_code", reason),
                 ),
             )
+        )
+
+    def reliability_snapshot(self, workspace: WorkspaceId) -> dict[str, int]:
+        """Bounded, rebuildable counters/gauges; never authorization state.
+
+        `safe_retry_candidates` counts lookup evidence, not dispatched retries.
+        No recovery method dispatches, so no successful-retry count is invented.
+        """
+        with self.store.atomic():
+            cases = self.classify(workspace)
+            events = self.store.events(workspace)
+            runs = self.store.runs(workspace)
+            lookup = [e for e in events if e.event_type is EventType.RECOVERY_LOOKUP]
+            return {
+                "recovery_cases_total": len(
+                    {
+                        dict(e.metadata).get("tool_invocation_id")
+                        for e in events
+                        if e.event_type is EventType.RECOVERY_DETECTED
+                    }
+                ),
+                "unknown_outcomes": sum(
+                    c.subject_type == "tool_invocation" and c.outcome == "outcome_unknown"
+                    for c in cases
+                ),
+                "reconciliation_success": sum(
+                    e.event_type is EventType.RECOVERY_RECEIPT_RECONCILED for e in events
+                ),
+                "manual_reconciliation_required": sum(
+                    c.subject_type == "tool_invocation"
+                    and c.reason
+                    in {
+                        RecoveryReason.MANUAL_REVIEW,
+                        RecoveryReason.TERMINAL_UNKNOWN,
+                        RecoveryReason.CONNECTOR_REQUIRED,
+                    }
+                    for c in cases
+                ),
+                "safe_retry_candidates": sum(
+                    dict(e.metadata).get("reason_code") == RemoteStatus.NEVER_RECEIVED.value
+                    for e in lookup
+                ),
+                "blocked_unsafe_retry_decisions": sum(
+                    dict(e.metadata).get("reason_code") == RemoteStatus.UNKNOWN.value
+                    for e in lookup
+                ),
+                "startup_incomplete_runs": sum(
+                    r.status in {AgentRunStatus.RUNNING, AgentRunStatus.WAITING} for r in runs
+                ),
+                "stale_claims": sum(
+                    self.clock.now() >= run.deadline
+                    and any(
+                        invocation.id
+                        not in {
+                            receipt.invocation.id
+                            for receipt in self.store.tool_receipts(workspace, run.id)
+                        }
+                        for invocation in self.store.tool_invocations(workspace, run.id)
+                    )
+                    for run in runs
+                ),
+            }
+
+    def _repair_receipt(self, receipt: ToolReceipt) -> RecoveryCase:
+        run = self.tools.reconcile_receipt(receipt)
+        reason = RecoveryReason.RESUME_LOCAL
+        if receipt.remote_outcome == "unknown":
+            reason = RecoveryReason.TERMINAL_UNKNOWN
+        elif run.status is AgentRunStatus.CANCELLED or (
+            self.store.domain.get_execution(run.execution_id).status.value == "cancelled"
+        ):
+            reason = RecoveryReason.CANCELLED
+        elif self.clock.now() >= run.deadline:
+            reason = RecoveryReason.EXPIRED
+        elif run.working_state.invocation_pending:
+            reason = RecoveryReason.MANUAL_REVIEW
+        return RecoveryCase(
+            run.workspace_id,
+            "tool_invocation",
+            str(receipt.invocation.id),
+            reason,
+            "outcome_unknown"
+            if receipt.remote_outcome == "unknown"
+            else "observed_success"
+            if receipt.output
+            else "observed_failure",
         )
 
     async def reconcile(
@@ -180,20 +302,7 @@ class RecoveryService:
                 None,
             )
             if existing is not None:
-                self.tools.reconcile_receipt(existing)
-                return RecoveryCase(
-                    workspace,
-                    "tool_invocation",
-                    str(invocation_id),
-                    RecoveryReason.TERMINAL_UNKNOWN
-                    if existing.remote_outcome == "unknown"
-                    else RecoveryReason.RESUME_LOCAL,
-                    "outcome_unknown"
-                    if existing.remote_outcome == "unknown"
-                    else "observed_success"
-                    if existing.output
-                    else "observed_failure",
-                )
+                return self._repair_receipt(existing)
             self._event(run, invocation, EventType.RECOVERY_DETECTED, "claimed_without_receipt")
         if not connector.capabilities.supports_status_lookup:
             return RecoveryCase(
@@ -219,14 +328,7 @@ class RecoveryService:
                 None,
             )
             if existing is not None:
-                self.tools.reconcile_receipt(existing)
-                return RecoveryCase(
-                    workspace,
-                    "tool_invocation",
-                    str(invocation_id),
-                    RecoveryReason.RESUME_LOCAL,
-                    "observed_success" if existing.output else "outcome_unknown",
-                )
+                return self._repair_receipt(existing)
             if current != invocation or invocation.status is not ToolInvocationStatus.RUNNING:
                 raise InvariantViolation("recovery_invocation_changed")
             self._event(run, invocation, EventType.RECOVERY_LOOKUP, lookup.status.value)
@@ -263,11 +365,4 @@ class RecoveryService:
                 self.tools.governance.consumed(receipt.invocation)
             self._event(run, invocation, EventType.RECOVERY_RECEIPT_RECONCILED, lookup.status.value)
         # Separate committed receipt from parent repair; window D is recoverable.
-        self.tools.reconcile_receipt(receipt)
-        return RecoveryCase(
-            workspace,
-            "tool_invocation",
-            str(invocation_id),
-            RecoveryReason.RESUME_LOCAL,
-            "observed_success" if output else "observed_failure",
-        )
+        return self._repair_receipt(receipt)

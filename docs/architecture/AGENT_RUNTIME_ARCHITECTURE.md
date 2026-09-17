@@ -1,5 +1,29 @@
 # Agent Runtime Architecture
 
+## Stage 10 restart behavior
+
+RuntimeStore has both in-memory and SQLite implementations. Absolute deadlines,
+iteration/tool usage, working state, exact definition/context packs, pending
+approval, and orchestration pins are restored rather than reset. Startup recovery
+classifies running/waiting runs, attempts, executions, orchestration, pending
+approvals, missing receipts, and receipt-only parent repair.
+
+Tool Runtime commits invocation ownership and approval reservation before external
+I/O, then commits receipt evidence. RecoveryService queries an explicitly bound
+trusted connector for status outside the canonical transaction. Known results
+create an auditable receipt without dispatch; unknown results require review.
+An already canonical unknown receipt is preserved rather than silently rewritten.
+Existing receipts can repair local observations idempotently. Recovery does not
+invent a lost model result or automatically finish a Task.
+OrchestrationService.reconcile_child repairs canonical child-result bookkeeping
+idempotently; failure-budget accounting survives a crash between child completion
+and parent reconciliation. It neither replans nor repeats child work.
+
+A `safe_to_retry` classification is evidence eligibility, never a fresh permission
+or a reset of a one-use claim. Automated post-claim redispatch and live-worker
+takeover are not implemented. Before-claim rollback can resume through the normal
+current-policy gate. No leases, queue, real integration, or new autonomy is added.
+
 ## Stage 9 consequential-action governance
 
 The strict call_tool Action can propose send_fixture_message. Governance-enabled runs
