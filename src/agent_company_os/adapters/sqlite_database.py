@@ -10,7 +10,8 @@ from agent_company_os.domain.errors import InvariantViolation
 def _migrations() -> tuple[str, ...]:
     root = Path(__file__).with_name("migrations")
     return tuple(
-        root.joinpath(name).read_text("utf-8") for name in ("001_domain.sql", "002_runtime.sql")
+        root.joinpath(name).read_text("utf-8")
+        for name in ("001_domain.sql", "002_runtime.sql", "003_operations.sql")
     )
 
 

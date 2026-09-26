@@ -94,6 +94,15 @@ class SqliteDomainStore(InMemoryDomainStore):
 class SqliteRuntimeStore(InMemoryRuntimeStore):
     _durable: SqliteStoreGroup
 
+    def require_consequential_dispatch(self, workspace_id: WorkspaceId) -> None:
+        """Checked under the SAME transaction that commits the dispatch claim."""
+        self.domain.get_workspace(workspace_id)
+        row = self._durable.connection.execute(
+            "SELECT mode FROM operational_modes WHERE workspace_id=?", (str(workspace_id),)
+        ).fetchone()
+        if row is not None and row[0] != "normal":
+            raise InvariantViolation("operational_mode_blocks_consequential_dispatch")
+
 
 @_scoped_operations
 class SqliteKnowledgeStore(InMemoryKnowledgeStore):

@@ -35,6 +35,10 @@ from agent_company_os.domain.transitions import StateTransition, SubjectType
 
 
 class InMemoryRuntimeStore:
+    def require_consequential_dispatch(self, workspace_id: WorkspaceId) -> None:
+        """Ephemeral unit-test store has no restored state or maintenance mode."""
+        self.domain.get_workspace(workspace_id)
+
     def runs(self, workspace_id: WorkspaceId) -> tuple[AgentRun, ...]:
         self.domain.get_workspace(workspace_id)
         return tuple(run for run in self._runs.values() if run.workspace_id == workspace_id)

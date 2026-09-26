@@ -25,6 +25,13 @@ known fixture outcomes without redispatch and leaves unknown outcomes blocked.
 It is an early-stage engineering foundation,
 not a deployed autonomous company or a production-ready AI service.
 
+**Stage 11 is in progress, not complete.** The first slice adds SQLite-backed local
+operator credentials/sessions, backend role/workspace checks, bounded inspection
+metadata, and a durable dispatch restriction. A SQLite backup and fresh restore
+adapter places restored workspaces in quarantine. The HTTP host, inspection console,
+stale approval restore drills, and load measurements remain pending. See the
+[Stage 11 checkpoint](docs/STAGE_11_REPORT.md); there is no runnable console yet.
+
 [Get started](#getting-started) · [Architecture](#architecture) ·
 [Execution flow](#tool-execution-flow) · [Roadmap](#roadmap) ·
 [Documentation](#documentation) · [Contribute](#contributing)
@@ -516,7 +523,7 @@ bounded retrieval, and combined knowledge/tool evidence without network calls.
 | 8 | Departments, registry, and organization graph | Implemented and verified offline |
 | 9 | Human approval and consequential-action governance | Implemented and verified offline |
 | 10 | Reliability, recovery, and audit-query foundations | Implemented and verified locally/offline |
-| 11 | Operator control plane, restore drills, and read-only inspection | Next scope; not yet implemented |
+| 11 | Operator control plane, restore drills, and read-only inspection | In progress: identity and initial queries; stage gate incomplete |
 | Later | Observability/approval UI, evaluations, integrations, and production | Deferred pending evidence |
 
 Stages are evidence gates, not release dates. Planning may eventually be deterministic,

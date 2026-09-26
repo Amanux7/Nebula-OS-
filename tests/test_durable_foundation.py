@@ -45,6 +45,7 @@ def test_bootstrap_once_reopen_and_foreign_keys(tmp_path: Path) -> None:
         assert connection.execute("SELECT version FROM schema_migrations").fetchall() == [
             (1,),
             (2,),
+            (3,),
         ]
         connection.execute("BEGIN IMMEDIATE")
         insert_workspace(connection)

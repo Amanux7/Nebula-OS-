@@ -1,5 +1,21 @@
 # Security and Permissions
 
+## Stage 11 identity checkpoint (incomplete stage)
+
+OperatorPrincipal is separate from AgentRun, ReviewerPrincipal and organization roles.
+Local bootstrap generates high-entropy credentials; login exchanges them for bounded
+sessions. Identity SQLite stores purpose-separated token digests, not raw credentials.
+Every authenticated query resolves enabled state, current account version, workspace
+and role before canonical reads. Account disablement/logout and their audit commit
+together. Even admin cannot export protected payloads or authorize Tool execution.
+
+Identity data is separate from canonical backup scope; old application snapshots must
+not restore operator sessions or disabled accounts. Filesystem administrators remain
+trusted. This does not protect against restoring an old identity database or stealing
+a bearer credential. HTTP transport/session hardening, rate limits, restore quarantine,
+and stale-approval restore tests are still required. No console or public server is
+implemented at this checkpoint. See ADR-014 and the Stage 11 report.
+
 ## Stage 10 durable threat boundary
 
 SQLite files and service composition are trusted host resources, not hostile-tenant
