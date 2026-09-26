@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent Company OS · Operator Console</title>
+  <link rel="stylesheet" href="/console.css">
+  <script src="/console.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar" aria-label="Operator navigation">
+      <div class="brand"><span class="mark">✳</span><span>AGENT COMPANY <strong>OS</strong><small>Operator console</small></span></div>
+      <div id="identity" class="identity">Session required</div>
+      <nav id="navigation" hidden>
+        <button data-view="overview">Overview</button>
+        <button data-view="organization">Organization</button>
+        <button data-view="departments">Departments</button>
+        <button data-view="agents">Agents</button>
+        <button data-view="goals">Goals</button>
+        <button data-view="tasks">Tasks</button>
+        <button data-view="runs">Agent runs</button>
+        <button data-view="orchestrations">Orchestration</button>
+        <button data-view="messages">Messages</button>
+        <button data-view="knowledge">Knowledge</button>
+        <button data-view="memory">Memory</button>
+        <button data-view="approvals">Approvals</button>
+        <button data-view="tools">Tools</button>
+        <button data-view="recovery">Recovery</button>
+        <button data-view="audit">Audit</button>
+      </nav>
+      <div class="sidebar-foot"><button id="logout" hidden>Sign out</button><span>LOCAL INSPECTION · STAGE 11</span></div>
+    </aside>
+    <main>
+      <header><div><p class="eyebrow">OPERATIONAL VISIBILITY</p><h1 id="heading">Operator console</h1></div>
+        <div id="connection" class="connection">Checking session…</div></header>
+      <section id="quarantine" class="alert" role="alert" hidden>
+        <strong>RESTORE QUARANTINE</strong><span>Inspection is available. Consequential execution is blocked. Recovery review is required.</span>
+      </section>
+      <section id="login" class="login-panel" hidden>
+        <p class="eyebrow">AUTHORIZED LOCAL ACCESS</p><h2>Sign in to inspect the platform</h2>
+        <p>Enter the one-time provisioned operator credential. This console reads canonical state; it does not run agents or approve actions.</p>
+        <form id="login-form"><label for="credential">Operator credential</label><input id="credential" type="password" autocomplete="off" required maxlength="64"><button type="submit">Start session</button></form>
+        <p id="login-error" class="error" role="status"></p>
+      </section>
+      <section id="content" hidden>
+        <div class="section-top"><p id="intro"></p><span id="count" class="count"></span></div>
+        <div id="overview" class="cards"></div>
+        <div id="data" class="panel"></div>
+        <div id="pager" class="pager"></div>
+        <div id="detail" class="panel detail" hidden></div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

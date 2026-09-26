@@ -15,12 +15,14 @@ from agent_company_os.domain.decisions import Action
 from agent_company_os.domain.events import Event
 from agent_company_os.domain.governance import ActionIntentId, ApprovalPolicy, GovernedAction
 from agent_company_os.domain.ids import TaskAttemptId, Version, WorkspaceId
+from agent_company_os.domain.operations import OperationalMode
 from agent_company_os.domain.tools import ToolInvocation, ToolReceipt
 from agent_company_os.domain.transitions import StateTransition
 from agent_company_os.ports.store import DomainStore
 
 
 class RuntimeStore(Protocol):
+    def operational_mode(self, workspace_id: WorkspaceId) -> OperationalMode: ...
     def require_consequential_dispatch(self, workspace_id: WorkspaceId) -> None: ...
     def runs(self, workspace_id: WorkspaceId) -> tuple[AgentRun, ...]: ...
     def approval_policy(self, workspace_id: WorkspaceId) -> ApprovalPolicy | None: ...

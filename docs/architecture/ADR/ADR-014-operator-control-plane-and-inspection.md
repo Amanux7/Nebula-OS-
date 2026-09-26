@@ -2,9 +2,11 @@
 
 ## Status
 
-Stage 11 implementation in progress, 2026-09-21. The identity and initial query
-decisions below are implemented. HTTP, console, backup/restore, quarantine and load
-evidence remain pending; this ADR is not a completion declaration.
+Stage 11 implementation in progress, updated 2026-09-26. Identity, the initial
+query seam, loopback HTTP host, read-only console, restrictive operational modes,
+backup/restore quarantine, and an offline load harness are implemented. Complete
+inspection lineage, quarantine release, and production security are deferred;
+this ADR is not a completion declaration.
 
 ## Context
 

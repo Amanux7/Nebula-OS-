@@ -25,12 +25,13 @@ known fixture outcomes without redispatch and leaves unknown outcomes blocked.
 It is an early-stage engineering foundation,
 not a deployed autonomous company or a production-ready AI service.
 
-**Stage 11 is in progress, not complete.** The first slice adds SQLite-backed local
-operator credentials/sessions, backend role/workspace checks, bounded inspection
-metadata, and a durable dispatch restriction. A SQLite backup and fresh restore
-adapter places restored workspaces in quarantine. The HTTP host, inspection console,
-stale approval restore drills, and load measurements remain pending. See the
-[Stage 11 checkpoint](docs/STAGE_11_REPORT.md); there is no runnable console yet.
+**Stage 11 is in progress, not complete.** A loopback-only operator inspection
+console now reads the canonical SQLite services through local operator sessions,
+workspace-scoped metadata queries, and read-only views. It is not the unrelated
+landing page. SQLite backup/restore places restored workspaces in durable
+quarantine; stale approved snapshots cannot dispatch fixture writes. The local
+host is a development preview, not a production deployment. See the
+[Stage 11 checkpoint](docs/STAGE_11_REPORT.md) for remaining gaps.
 
 [Get started](#getting-started) · [Architecture](#architecture) ·
 [Execution flow](#tool-execution-flow) · [Roadmap](#roadmap) ·
@@ -97,7 +98,7 @@ cannot grant permissions, bypass domain invariants, or certify its own success.
 | Governance | Exact payload fingerprints, explicit reviewers, expiry/revocation, one-use approval, and bounded Level 3 fixture execution |
 | Durable recovery | Shared SQLite transactions, explicit migrations, durable dispatch claims, independent fixture ledger, restart classification and receipt reconciliation |
 | Audit queries | Workspace-scoped timelines, approval/invocation views, and structural Goal-to-receipt lineage |
-| Verification | 514 passing offline tests; Ruff formatting/lint, mypy, and whitespace checks pass. See the [Stage 10 report](docs/STAGE_10_REPORT.md) |
+| Verification | Stage 10: 514 passing offline tests. Stage 11 checkpoint evidence is in the [Stage 11 report](docs/STAGE_11_REPORT.md) |
 
 The only supplied agent type is the **Research Brief Agent**. It can operate on
 approved supplied facts or receive an immutable definition upgrade granting the
@@ -108,7 +109,7 @@ scripted; no live LLM provider is wired in.
 
 ### Local durability and inspection
 
-Stage 10 is an offline backend proof, not a product dashboard. The independent
+The independent
 fixture ledger represents an external system; no real message is sent. Run its
 restart demonstrations and safe audit-query tests locally:
 
@@ -129,6 +130,21 @@ for a separately scoped future inspection UI; the landing page is not the platfo
 Recovery never automatically dispatches: a missing receipt means uncertainty,
 not permission to retry. See [ADR-013](docs/architecture/ADR/ADR-013-durable-state-recovery-and-audit.md)
 and the [Stage 10 report](docs/STAGE_10_REPORT.md) for tested guarantees and limits.
+
+For the Stage 11 local inspection preview, use the repository virtual environment:
+
+```powershell
+.\.venv\Scripts\python.exe -m agent_company_os.operator_cli bootstrap --canonical .local/aurora.sqlite --identity .local/operators.sqlite
+.\.venv\Scripts\python.exe -m agent_company_os.operator_cli seed-aurora --canonical .local/aurora.sqlite --identity .local/operators.sqlite
+.\.venv\Scripts\python.exe -m agent_company_os.operator_cli provision --canonical .local/aurora.sqlite --identity .local/operators.sqlite --workspace YOUR_WORKSPACE_ID --operator local-viewer --role viewer
+.\.venv\Scripts\python.exe -m agent_company_os.operator_cli serve --canonical .local/aurora.sqlite --identity .local/operators.sqlite --port 8787
+```
+
+Open `http://127.0.0.1:8787/` and enter the one-time credential printed by
+provisioning. Use fresh local database paths for a new demo; seeding is not an
+idempotent production bootstrap. The host binds only to loopback and has no
+agent worker or external connector. Do not publish the credential or expose the
+port to a network.
 
 The implemented architecture is a **modular Python application**, not a microservice
 deployment. These are logical responsibilities, not separately deployed services.

@@ -52,6 +52,7 @@ from agent_company_os.domain.ids import (
     Version,
     WorkspaceId,
 )
+from agent_company_os.domain.operations import OperationalMode
 from agent_company_os.domain.organization_ids import OrganizationGraphId
 from agent_company_os.domain.task import Task
 from agent_company_os.domain.task_attempt import TaskAttempt
@@ -94,13 +95,19 @@ class SqliteDomainStore(InMemoryDomainStore):
 class SqliteRuntimeStore(InMemoryRuntimeStore):
     _durable: SqliteStoreGroup
 
-    def require_consequential_dispatch(self, workspace_id: WorkspaceId) -> None:
-        """Checked under the SAME transaction that commits the dispatch claim."""
+    def operational_mode(self, workspace_id: WorkspaceId) -> OperationalMode:
         self.domain.get_workspace(workspace_id)
         row = self._durable.connection.execute(
             "SELECT mode FROM operational_modes WHERE workspace_id=?", (str(workspace_id),)
         ).fetchone()
-        if row is not None and row[0] != "normal":
+        try:
+            return OperationalMode(row[0]) if row else OperationalMode.NORMAL
+        except ValueError:
+            raise InvariantViolation("invalid_operational_mode") from None
+
+    def require_consequential_dispatch(self, workspace_id: WorkspaceId) -> None:
+        """Checked under the SAME transaction that commits the dispatch claim."""
+        if self.operational_mode(workspace_id) is not OperationalMode.NORMAL:
             raise InvariantViolation("operational_mode_blocks_consequential_dispatch")
 
 

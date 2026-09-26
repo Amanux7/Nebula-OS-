@@ -1,5 +1,6 @@
 """Stage 11 durable safety controls on genuinely reopened SQLite stores."""
 
+import asyncio
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -18,9 +19,11 @@ from agent_company_os.application.operations import OperationalModeService
 from agent_company_os.application.operator import OperatorService
 from agent_company_os.application.service import CreateGoalCommand, DomainService
 from agent_company_os.domain.errors import InvariantViolation
+from agent_company_os.domain.governance import DecisionKind
 from agent_company_os.domain.operations import OperationalMode
 from agent_company_os.domain.operator import OperatorId, OperatorRole
 from test_operator import TestSecrets
+from test_recovery import prepare, reopen
 
 
 def test_migration_mode_and_read_only_inspection(tmp_path: Path) -> None:
@@ -95,3 +98,101 @@ def test_authenticated_fresh_restore_quarantines_old_approval_state(tmp_path: Pa
     finally:
         operator_store.close()
         group.close()
+
+
+def test_backup_rejects_multi_workspace_source_without_plaintext_output(tmp_path: Path) -> None:
+    source = tmp_path / "canonical.sqlite"
+    migrate_database(source)
+    group = SqliteStoreGroup(source)
+    clock = FakeClock(datetime(2026, 9, 21, tzinfo=UTC))
+    domain = DomainService(group.domain, clock, DeterministicIdGenerator("scope"))
+    workspace = domain.create_workspace("Authorized")
+    domain.create_workspace("Unrelated")
+    group.close()
+    backup_root = tmp_path / "backups"
+    adapter = SqliteBackupAdapter(source, backup_root, tmp_path / "restores")
+    with pytest.raises(InvariantViolation, match="backup_requires_single_authorized_workspace"):
+        adapter.create("scoped", workspace.id, clock.now())
+    assert not (backup_root / "scoped").exists()
+
+
+def test_stale_approved_snapshot_cannot_duplicate_remote_effect(
+    tmp_path: Path, clock: FakeClock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path, remote, group, executor, harness = prepare(  # type: ignore[no-untyped-call]
+        tmp_path, clock, monkeypatch
+    )
+    workspace, run_id, intent_id = harness.workspace.id, harness.run.id, harness.record().intent.id
+    adapter = SqliteBackupAdapter(path, tmp_path / "backups", tmp_path / "restores")
+    adapter.create("approved", workspace, clock.now())
+    harness.resume()
+    assert executor.effect_count() == 1
+    group.close()
+    executor.close()
+    monkeypatch.undo()
+    adapter.restore("approved", "stale", workspace, "operator", clock.now())
+    restored_path = tmp_path / "restores" / "stale" / "canonical.sqlite"
+    restored, remote_executor, _recovery, runtime = reopen(  # type: ignore[no-untyped-call]
+        restored_path, remote, clock, harness.tool
+    )
+    try:
+        old = restored.runtime.get_run(workspace, run_id)
+        assert (
+            restored.runtime.governed_action(workspace, intent_id).decisions[-1].kind.value
+            == "approved"
+        )
+        cases = _recovery.classify(workspace)
+        assert any(
+            case.subject_type == "action_intent" and case.reason.value == "manual_review_required"
+            for case in cases
+        )
+        with pytest.raises(InvariantViolation, match="operational_mode_blocks"):
+            asyncio.run(runtime.resume_approval(workspace, run_id, intent_id, old.version))
+        assert remote_executor.effect_count() == 1
+        assert remote_executor.calls == 0
+        assert restored.runtime.tool_invocations(workspace, run_id) == ()
+    finally:
+        remote_executor.close()
+        restored.close()
+
+
+def test_revocation_after_backup_does_not_survive_as_dispatch_authority(
+    tmp_path: Path, clock: FakeClock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path, remote, group, executor, harness = prepare(  # type: ignore[no-untyped-call]
+        tmp_path, clock, monkeypatch
+    )
+    workspace, intent_id = harness.workspace.id, harness.record().intent.id
+    adapter = SqliteBackupAdapter(path, tmp_path / "backups", tmp_path / "restores")
+    adapter.create("approved", workspace, clock.now())
+    harness.governance.decide(
+        workspace,
+        intent_id,
+        harness.record().intent.fingerprint,
+        harness.reviewer,
+        DecisionKind.REVOKED,
+    )
+    assert harness.record().decisions[-1].kind is DecisionKind.REVOKED
+    group.close()
+    executor.close()
+    monkeypatch.undo()
+    adapter.restore("approved", "old-approval", workspace, "operator", clock.now())
+    restored_path = tmp_path / "restores" / "old-approval" / "canonical.sqlite"
+    restored, remote_executor, recovery, runtime = reopen(  # type: ignore[no-untyped-call]
+        restored_path, remote, clock, harness.tool
+    )
+    try:
+        assert (
+            restored.runtime.governed_action(workspace, intent_id).decisions[-1].kind
+            is DecisionKind.APPROVED
+        )
+        assert any(
+            case.reason.value == "manual_review_required" for case in recovery.classify(workspace)
+        )
+        old = restored.runtime.get_run(workspace, harness.run.id)
+        with pytest.raises(InvariantViolation, match="operational_mode_blocks"):
+            asyncio.run(runtime.resume_approval(workspace, old.id, intent_id, old.version))
+        assert remote_executor.effect_count() == 0
+    finally:
+        remote_executor.close()
+        restored.close()

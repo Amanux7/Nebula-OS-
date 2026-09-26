@@ -11,6 +11,7 @@ from agent_company_os.domain.errors import InvariantViolation
 from agent_company_os.domain.events import Event, EventType
 from agent_company_os.domain.governance import DecisionKind
 from agent_company_os.domain.ids import WorkspaceId
+from agent_company_os.domain.operations import OperationalMode
 from agent_company_os.domain.recovery import (
     RecoveryCase,
     RecoveryReason,
@@ -90,6 +91,11 @@ class RecoveryService:
                     elif (
                         record.decisions and record.decisions[-1].kind is not DecisionKind.APPROVED
                     ):
+                        reason = RecoveryReason.MANUAL_REVIEW
+                    elif (
+                        self.store.operational_mode(workspace) is OperationalMode.RESTORE_QUARANTINE
+                    ):
+                        # An old snapshot cannot know if remote effects followed it.
                         reason = RecoveryReason.MANUAL_REVIEW
                     cases.append(
                         RecoveryCase(

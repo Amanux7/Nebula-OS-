@@ -59,29 +59,39 @@ class SqliteBackupAdapter:
             group.close()
 
     def create(self, name: str, workspace: WorkspaceId, at: datetime) -> BackupManifest:
+        # Refuse an unauthorized/multi-workspace source before creating plaintext output.
+        self._scope(self.source, workspace)
         directory = _child(self.backups, name)
         directory.mkdir(mode=0o700)  # exclusive; never overwrite a snapshot
         target = directory / "canonical.sqlite"
-        source = open_database(self.source)
         try:
-            destination = sqlite3.connect(target)
+            source = open_database(self.source)
             try:
-                with destination:
-                    source.backup(destination)
+                destination = sqlite3.connect(target)
+                try:
+                    with destination:
+                        source.backup(destination)
+                finally:
+                    destination.close()
             finally:
-                destination.close()
-        finally:
-            source.close()
-        target.chmod(0o600)
-        self._scope(target, workspace)
-        manifest = BackupManifest(
-            name, at.isoformat(), len(_expected()), _digest(target), str(workspace)
-        )
-        manifest_path = directory / "manifest.json"
-        with manifest_path.open("x", encoding="utf-8") as stream:
-            json.dump(asdict(manifest), stream, sort_keys=True)
-        manifest_path.chmod(0o600)
-        return manifest
+                source.close()
+            target.chmod(0o600)
+            # Recheck the actual snapshot, since the source may have changed meanwhile.
+            self._scope(target, workspace)
+            manifest = BackupManifest(
+                name, at.isoformat(), len(_expected()), _digest(target), str(workspace)
+            )
+            manifest_path = directory / "manifest.json"
+            with manifest_path.open("x", encoding="utf-8") as stream:
+                json.dump(asdict(manifest), stream, sort_keys=True)
+            manifest_path.chmod(0o600)
+            return manifest
+        except Exception:
+            # A failed scope check must not leave an unowned plaintext backup.
+            for name_to_remove in ("manifest.json", "canonical.sqlite"):
+                (directory / name_to_remove).unlink(missing_ok=True)
+            directory.rmdir()
+            raise
 
     def restore(
         self, name: str, destination: str, workspace: WorkspaceId, principal: str, at: datetime
