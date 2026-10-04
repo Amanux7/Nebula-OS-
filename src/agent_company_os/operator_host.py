@@ -15,10 +15,10 @@ from enum import Enum
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from threading import Lock
+from threading import BoundedSemaphore, Lock
 from time import monotonic
 from typing import Any
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 
 from agent_company_os.adapters.clocks import SystemClock
 from agent_company_os.adapters.ids import SystemIdGenerator
@@ -48,12 +48,15 @@ class HostConfig:
     identity_db: Path
     port: int = 0
     bind: str = "127.0.0.1"
+    inspection_limit: int = 10_000
 
     def __post_init__(self) -> None:
         if self.bind != "127.0.0.1" or type(self.port) is not int or not 0 <= self.port <= 65535:
             raise InvariantViolation("operator_host_loopback_only")
         if self.canonical_db.resolve() == self.identity_db.resolve():
             raise InvariantViolation("operator_identity_must_be_separate")
+        if type(self.inspection_limit) is not int or not 1 <= self.inspection_limit <= 10_000:
+            raise InvariantViolation("inspection_limit_invalid")
 
 
 @dataclass
@@ -67,7 +70,7 @@ class _Services:
 
 @contextmanager
 def _services(config: HostConfig) -> Iterator[_Services]:
-    group = SqliteStoreGroup(config.canonical_db)
+    group = SqliteStoreGroup(config.canonical_db, inspection_limit=config.inspection_limit)
     try:
         identity = SqliteOperatorStore(config.identity_db)
         try:
@@ -88,7 +91,7 @@ def _services(config: HostConfig) -> Iterator[_Services]:
                 identity,
                 operator,
                 queries,
-                OperationalModeService(operator, SqliteOperationalStore(group)),
+                OperationalModeService(operator, SqliteOperationalStore(group), recovery),
             )
         finally:
             identity.close()
@@ -111,7 +114,7 @@ def _json_safe(value: Any) -> Any:
         return [_json_safe(item) for item in value]
     if isinstance(value, dict):
         return {str(key): _json_safe(item) for key, item in value.items()}
-    if value is None or type(value) in (str, int, bool):
+    if value is None or type(value) in (str, int, bool, float):
         return value
     raise InvariantViolation("unsupported_http_projection")
 
@@ -119,16 +122,63 @@ def _json_safe(value: Any) -> Any:
 class _OperatorHTTPServer(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
+    request_queue_size = 8
 
     def __init__(self, config: HostConfig) -> None:
         self.config = config
         self._login_lock = Lock()
         self._login_failures: dict[str, list[float]] = {}
+        self._workers = BoundedSemaphore(4)
+        self._metrics_lock = Lock()
+        self.metrics: dict[str, int | float] = {
+            "requests": 0,
+            "authentication_failures": 0,
+            "authorization_failures": 0,
+            "request_duration_ms": 0.0,
+            "query_duration_ms": 0.0,
+            "responses_2xx": 0,
+            "responses_4xx": 0,
+            "responses_5xx": 0,
+        }
+        started = monotonic()
+        self.workspace_startup: dict[str, dict[str, Any]] = {}
         # Opening every canonical collection now catches a corrupt DB before binding.
         with _services(config) as services:
             for workspace in services.group.domain.workspaces():
-                services.queries.recovery.classify(workspace.id)
+                self.workspace_startup[str(workspace.id)] = {
+                    "recovery_count": len(services.queries.recovery.classify(workspace.id)),
+                    "mode": services.group.runtime.operational_mode(workspace.id).value,
+                }
+            schema = services.group.connection.execute(
+                "SELECT MAX(version) FROM schema_migrations"
+            ).fetchone()[0]
+        self.startup = {
+            "duration_ms": round((monotonic() - started) * 1000, 3),
+            "database_open": "ok",
+            "canonical_schema": schema,
+            "identity_schema": 1,
+        }
         super().__init__((config.bind, config.port), _OperatorHandler)
+
+    def process_request(self, request: Any, client_address: Any) -> None:
+        if not self._workers.acquire(timeout=1):
+            request.close()
+            return
+        try:
+            super().process_request(request, client_address)
+        except BaseException:
+            self._workers.release()
+            raise
+
+    def process_request_thread(self, request: Any, client_address: Any) -> None:
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._workers.release()
+
+    def metric(self, name: str, value: int | float = 1) -> None:
+        with self._metrics_lock:
+            self.metrics[name] += value
 
     @property
     def origin(self) -> str:
@@ -137,19 +187,23 @@ class _OperatorHTTPServer(ThreadingHTTPServer):
     def login_allowed(self, client: str) -> bool:
         with self._login_lock:
             now = monotonic()
-            previous = [t for t in self._login_failures.get(client, ()) if now - t < 60]
-            self._login_failures[client] = previous
-            return len(previous) < 5
-
-    def login_failed(self, client: str) -> None:
-        with self._login_lock:
-            self._login_failures.setdefault(client, []).append(monotonic())
+            # One bounded loopback bucket, charged before auth to avoid racing failures.
+            previous = [t for t in self._login_failures.get("loopback", ()) if now - t < 60]
+            allowed = len(previous) < 5
+            if allowed:
+                previous.append(now)
+            self._login_failures = {"loopback": previous}
+            return allowed
 
 
 class _OperatorHandler(BaseHTTPRequestHandler):
     server: _OperatorHTTPServer
     server_version = "AgentCompanyOperator/0.1"
     sys_version = ""
+
+    def setup(self) -> None:
+        super().setup()
+        self.connection.settimeout(5)
 
     def log_message(self, format: str, *args: object) -> None:
         # Default logger includes URL, which may contain a guessed ID or token.
@@ -169,6 +223,14 @@ class _OperatorHandler(BaseHTTPRequestHandler):
             else value
         )
         self.send_response(status)
+        category = (
+            "responses_2xx"
+            if status < 400
+            else "responses_4xx"
+            if status < 500
+            else "responses_5xx"
+        )
+        self.server.metric(category)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(payload)))
         self.send_header("Cache-Control", "no-store")
@@ -189,6 +251,11 @@ class _OperatorHandler(BaseHTTPRequestHandler):
         self._send(status, {"error": {"code": code}})
 
     def _guard(self, mutation: bool = False) -> None:
+        for name in ("Host", "Origin", "X-Operator-Request", "Content-Type", "Content-Length"):
+            if len(self.headers.get_all(name, [])) > 1:
+                raise OperatorAccessDenied()
+        if self.headers.get("Transfer-Encoding") is not None:
+            raise InvariantViolation("transfer_encoding_unsupported")
         if self.headers.get("Host") != f"127.0.0.1:{self.server.server_port}":
             raise OperatorAccessDenied()
         if len(self.path) > 2048 or len(self.headers.as_bytes()) > 8192:
@@ -225,6 +292,8 @@ class _OperatorHandler(BaseHTTPRequestHandler):
         return data
 
     def _handle(self, mutation: bool) -> None:
+        started = monotonic()
+        self.server.metric("requests")
         try:
             self._guard(mutation)
             path = urlsplit(self.path)
@@ -235,21 +304,36 @@ class _OperatorHandler(BaseHTTPRequestHandler):
                 raise InvariantViolation("duplicate_query_parameter")
             query = {key: value[0] for key, value in parsed.items()}
             if mutation:
+                if query:
+                    raise InvariantViolation("mutation_query_unsupported")
                 self._post(path.path)
             else:
                 self._get(path.path, query)
         except AuthenticationDenied:
+            self.server.metric("authentication_failures")
             self._error(HTTPStatus.UNAUTHORIZED, "authentication_required")
         except OperatorAccessDenied:
+            self.server.metric("authorization_failures")
             self._error(HTTPStatus.FORBIDDEN, "access_denied")
         except EntityNotFound:
             self._error(HTTPStatus.NOT_FOUND, "not_found")
         except DomainError as error:
-            self._error(HTTPStatus.BAD_REQUEST, error.code)
+            if error.details.get("rule") == "inspection_capacity_exceeded":
+                self._error(HTTPStatus.SERVICE_UNAVAILABLE, "inspection_capacity_exceeded")
+            else:
+                self._error(HTTPStatus.BAD_REQUEST, error.code)
         except (ValueError, KeyError):
             self._error(HTTPStatus.BAD_REQUEST, "invalid_request")
-        except sqlite3.Error:
+        except (ConnectionError, TimeoutError):
+            # A disconnected local browser cannot receive a second error response.
+            return
+        except (sqlite3.Error, OSError):
             self._error(HTTPStatus.SERVICE_UNAVAILABLE, "storage_unavailable")
+        finally:
+            duration = (monotonic() - started) * 1000
+            self.server.metric("request_duration_ms", duration)
+            if not mutation:
+                self.server.metric("query_duration_ms", duration)
 
     def do_GET(self) -> None:
         self._handle(False)
@@ -274,6 +358,12 @@ class _OperatorHandler(BaseHTTPRequestHandler):
             return
         assets = {
             "/": ("index.html", "text/html; charset=utf-8"),
+            "/command": ("command.html", "text/html; charset=utf-8"),
+            "/spatial.js": ("spatial.js", "text/javascript; charset=utf-8"),
+            "/spatial-data.js": ("spatial-data.js", "text/javascript; charset=utf-8"),
+            "/spatial-core.js": ("spatial-core.js", "text/javascript; charset=utf-8"),
+            "/audio.js": ("audio.js", "text/javascript; charset=utf-8"),
+            "/spatial.css": ("spatial.css", "text/css; charset=utf-8"),
             "/console.js": ("console.js", "text/javascript; charset=utf-8"),
             "/console.css": ("console.css", "text/css; charset=utf-8"),
         }
@@ -329,12 +419,43 @@ class _OperatorHandler(BaseHTTPRequestHandler):
                     raise InvariantViolation("invalid_query")
                 self._send(
                     200,
-                    services.queries.recovery_cases(
+                    services.queries.recovery_incidents(
                         token,
                         workspace,
                         limit=int(query.get("limit", "25")),
                         cursor=query.get("cursor"),
                     ),
+                )
+            elif re.fullmatch(r"/api/v1/lineage/[^/]+/[^/]{1,768}", path):
+                if query:
+                    raise InvariantViolation("invalid_query")
+                category, identifier = path.removeprefix("/api/v1/lineage/").split("/", 1)
+                self._send(
+                    200, services.queries.lineage(token, workspace, category, unquote(identifier))
+                )
+            elif path == "/api/v1/restore":
+                self._send(
+                    200,
+                    {
+                        "context": services.modes.context(token, workspace),
+                        "release_attempts": services.modes.audit(token, workspace),
+                    },
+                )
+            elif path == "/api/v1/diagnostics":
+                services.operator.authorize(token, workspace, OperatorResource.ACCOUNT_ADMIN)
+                with self.server._metrics_lock:
+                    metrics = dict(self.server.metrics)
+                self._send(
+                    200,
+                    {
+                        "startup": {
+                            **self.server.startup,
+                            **self.server.workspace_startup.get(str(workspace), {}),
+                        },
+                        "requests": metrics,
+                        "inspection_max_records": self.server.config.inspection_limit,
+                        "inspection_max_bytes": 32 * 1024 * 1024,
+                    },
                 )
             elif re.fullmatch(r"/api/v1/audit/goals/[^/]{1,256}", path):
                 if set(query) - {"limit", "cursor"}:
@@ -380,11 +501,7 @@ class _OperatorHandler(BaseHTTPRequestHandler):
                 body = self._body()
                 if set(body) != {"credential"} or type(body["credential"]) is not str:
                     raise InvariantViolation("invalid_login_body")
-                try:
-                    token = services.operator.login(body["credential"]).value
-                except AuthenticationDenied:
-                    self.server.login_failed(self.client_address[0])
-                    raise
+                token = services.operator.login(body["credential"]).value
                 self._send(
                     200,
                     {"authenticated": True},
@@ -412,6 +529,15 @@ class _OperatorHandler(BaseHTTPRequestHandler):
                 )
                 self._send(
                     200, {"mode": services.modes.status(token, principal.workspace_id).value}
+                )
+            elif path == "/api/v1/mode/release":
+                if self._body() != {}:
+                    raise InvariantViolation("release_body_must_be_empty")
+                principal = services.operator.principal(token)
+                result = services.modes.release(token, principal.workspace_id)
+                self._send(
+                    200 if result.success else 403 if result.reason == "admin_required" else 409,
+                    result,
                 )
             else:
                 self._error(404, "not_found")

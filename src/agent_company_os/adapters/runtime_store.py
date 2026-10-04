@@ -40,7 +40,13 @@ class InMemoryRuntimeStore:
         self.domain.get_workspace(workspace_id)
         return OperationalMode.NORMAL
 
-    def require_consequential_dispatch(self, workspace_id: WorkspaceId) -> None:
+    def intent_held(self, workspace_id: WorkspaceId, intent_id: ActionIntentId) -> bool:
+        self.domain.get_workspace(workspace_id)
+        return False
+
+    def require_consequential_dispatch(
+        self, workspace_id: WorkspaceId, intent_id: ActionIntentId | None = None
+    ) -> None:
         """Ephemeral unit-test store has no restored state or maintenance mode."""
         self.domain.get_workspace(workspace_id)
 

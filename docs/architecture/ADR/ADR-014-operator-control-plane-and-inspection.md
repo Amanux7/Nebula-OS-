@@ -2,11 +2,11 @@
 
 ## Status
 
-Stage 11 implementation in progress, updated 2026-09-26. Identity, the initial
-query seam, loopback HTTP host, read-only console, restrictive operational modes,
-backup/restore quarantine, and an offline load harness are implemented. Complete
-inspection lineage, quarantine release, and production security are deferred;
-this ADR is not a completion declaration.
+Accepted for the local/offline Stage 11 scope, finalized 2026-09-29. The earlier
+checkpoint discussion below is retained as decision history; statements about
+pending implementation are superseded by the final evidence section. Production
+identity, distributed recovery and real connectors remain deferred. See the
+[Stage 11 report](../../STAGE_11_REPORT.md) for actual acceptance results.
 
 ## Context
 
@@ -156,3 +156,72 @@ publishes the canonical filename after quarantine is committed and state validat
 Identity and remote fixture databases are excluded. No quarantine release command
 is provided: inspecting or acknowledging a case is not sufficient proof to revive
 stale authorization. Implementation and drill evidence follows in the stage report.
+
+## Final implemented decision and evidence — 2026-09-29
+
+Retain the separate identity database, generated 256-bit credentials and 15-minute
+sessions. No SSO, password scheme, production auth or agent authority is implied.
+The HTTP host uses four bounded request workers with one SQLite connection per
+request, not an unbounded thread pool. Exact Host/Origin, duplicate-header denial,
+custom mutation header, CSP, HttpOnly/SameSite cookie, safe errors and bounded
+body/query sizes are tested. Local login is limited to five attempts per 60 seconds
+in one process-wide loopback bucket, including successful attempts. No Redis is needed.
+
+Inspection now includes explicit scalar allowlists plus typed links/lineage for
+all major canonical subsystems. Goal→Plan/Tasks→Delegation/Attempt→AgentRun→Result
+and intent→request/decision→claim/invocation→receipt can be followed. Communication,
+Knowledge/Memory and configuration pins are metadata-only. The console renders
+stored strings with textContent and has actual Chromium CSP/XSS/navigation evidence.
+The Aurora Desk fixture creates a real accepted plan, four delegations (one handoff
+replacement), messages, eight runs and results through application services.
+
+Migration 004 adds immutable restore provenance, a local generation counter and
+per-intent holds. Restore writes quarantine/provenance/holds before publishing the
+fresh database filename. Source and destination paths must be trusted and distinct;
+traversal, links/junctions and overwrite attempts fail. Ordinary partial failures
+are cleaned; abrupt death can leave unpublished staging output. Files remain
+plaintext, checksums unsigned. POSIX mode hints are best-effort; Windows parent
+ACL review is required. This does not defeat malicious administrators or path races.
+
+Only an authenticated same-workspace admin can release restore_quarantine. The
+canonical transaction validates schema on open, strict canonical decoding, SQLite
+integrity/foreign keys, restore provenance, completed recovery classification and
+a hold for every existing consequential intent. It then changes only mode and
+appends release audit atomically. Role/precondition denials are audited without
+changing mode; failed audit persistence rolls back success. An unavailable or
+undecodable database cannot persist failure evidence and fails closed instead.
+
+**All intents in the restored snapshot remain held after release.** Unknown cases
+can coexist with normal mode because they retain their own dispatch denial and
+existing invocation ownership. There is no force/hold-clear API. Old approvals
+cannot resurrect authority missing from the original timeline. A committed claim
+can be looked up in the independent remote fixture and reconciled without another
+dispatch; a pre-claim snapshot may have no such key and must remain unresolved.
+Release itself neither looks up remote status nor resumes, consumes, approves,
+dispatches, repairs or completes work. Tests prove both later revocation and later
+remote effect cannot cause replay after restore/release.
+
+Health is process liveness; readiness validates both databases and service
+composition. Recovery cases and quarantine alone do not block inspection readiness.
+Safe startup/request metrics have fixed labels; per-workspace startup information
+is scoped. Backup command outcomes are bounded local counters, not remote telemetry.
+
+Profiling at 205 Goals/1,009 Tasks shows full decode/validation/encoding dominates:
+warm query medians 1.4–1.8 seconds on the measured Windows host. The current full
+domain read plan is a table scan; a workspace/kind metadata lookup uses a covering
+index, but the latter is not the full current query. No speculative index/projection
+is introduced. Host composition instead caps 10,000 canonical/audit records,
+32 MiB payload total and 1 MiB per record before decoding; auxiliary row scans
+are capped at 20 times the configured record limit. Pages and lineage sections
+remain bounded at 100. Tests prove early rejection before codec invocation.
+These bounds are not a latency SLO; large-history reads need a later design.
+
+Lock order remains identity→canonical. Separate-connection tests cover Goal writes
+and atomic ToolReceipt/Event visibility with bounded local contention. No canonical
+transaction holds identity in the opposite order. Full regression: 574 passing
+tests, including local real-browser acceptance; see the report for exact commands.
+
+Deferred: production identity/TLS, authenticated connector reconciliation UI,
+distributed fencing, reviewed replacement of held work, backup signing/encryption,
+identity restore runbook, sustained load, accessible product UX, and production
+read projections. Stage 12 is not implemented.

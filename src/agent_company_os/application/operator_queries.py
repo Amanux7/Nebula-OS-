@@ -1,7 +1,7 @@
 """Initial authenticated read DTOs; no SQL, model calls, or canonical mutations.
 
 Offset pages are bounded and stable under a static dataset, not snapshot cursors.
-The Stage 10 adapter still decodes full records; pagination here bounds responses only.
+The host also enforces a pre-decode record/byte budget on the SQLite adapter.
 """
 
 from collections.abc import Iterator
@@ -18,7 +18,13 @@ from agent_company_os.domain.goal import GoalStatus
 from agent_company_os.domain.ids import GoalId, TaskId, WorkspaceId
 from agent_company_os.domain.operator import OperatorResource
 from agent_company_os.domain.recovery import RecoveryCase
-from agent_company_os.ports.inspection import InspectionCatalog, InspectionRecord
+from agent_company_os.ports.inspection import (
+    InspectionCatalog,
+    InspectionLineage,
+    InspectionLink,
+    InspectionRecord,
+    LineageSection,
+)
 from agent_company_os.ports.runtime_store import RuntimeStore
 
 
@@ -84,6 +90,55 @@ class AgentRunSummary:
     result_available: bool
 
 
+@dataclass(frozen=True)
+class RecoveryIncidentSummary:
+    subject_type: str
+    subject_id: str
+    reason: str
+    outcome: str
+    explanation: str
+    links: tuple[InspectionLink, ...]
+
+
+RECOVERY_TEXT = {
+    "resume_local_state": "Inspect persisted state for local repair. No dispatch is implied.",
+    "safe_to_retry": "Candidate only. Non-execution evidence and current authority are required.",
+    "awaiting_human_approval": "Work is waiting on an exact-action human decision.",
+    "connector_reconciliation_required": (
+        "Dispatch was claimed without a receipt. Look up remote status; do not retry the write."
+    ),
+    "manual_review_required": (
+        "Evidence or authority is missing. Restored intents stay blocked after release."
+    ),
+    "terminal_unknown": "The recorded external outcome is unknown. It is not a retryable failure.",
+    "expired": "The persisted deadline or approval expiry has passed.",
+    "cancelled": "Work was cancelled. Cancellation does not undo a remote effect.",
+}
+
+LINEAGE_KINDS = (
+    "goals",
+    "tasks",
+    "attempts",
+    "executions",
+    "runs",
+    "orchestrations",
+    "plans",
+    "materializations",
+    "delegations",
+    "delegation_attempts",
+    "results",
+    "messages",
+    "threads",
+    "handoffs",
+    "intents",
+    "approvals",
+    "approval_requests",
+    "approval_decisions",
+    "invocations",
+    "receipts",
+)
+
+
 class OperatorQueryService:
     def __init__(
         self,
@@ -106,6 +161,40 @@ class OperatorQueryService:
             recovery,
         )
         self.catalog = catalog
+
+    def lineage(
+        self, token: str, workspace: WorkspaceId, kind: str, entity_id: str
+    ) -> InspectionLineage:
+        with self._scope(token, workspace, OperatorResource.OPERATIONAL):
+            if self.catalog is None or kind not in LINEAGE_KINDS:
+                raise InvariantViolation("unsupported_lineage_kind")
+            rows = {
+                category: self.catalog.records(workspace, category) for category in LINEAGE_KINDS
+            }
+            root = next((r for r in rows[kind] if r.id == entity_id), None)
+            if root is None:
+                raise EntityNotFound(kind, entity_id)
+            selected = {(kind, entity_id)}
+            # Inbound structural references only: do not fan out through common Workspace
+            # or AgentDefinition ancestors into unrelated work.
+            for _ in range(12):
+                before = len(selected)
+                for category, records in rows.items():
+                    for record in records:
+                        if any((link.kind, link.id) in selected for link in record.links):
+                            selected.add((category, record.id))
+                if len(selected) == before:
+                    break
+            sections = []
+            for category, records in rows.items():
+                matches = tuple(
+                    r
+                    for r in records
+                    if (category, r.id) in selected and (category, r.id) != (kind, entity_id)
+                )
+                if matches:
+                    sections.append(LineageSection(category, matches[:100], len(matches) > 100))
+            return InspectionLineage(root, tuple(sections))
 
     def inspect(
         self,
@@ -231,3 +320,35 @@ class OperatorQueryService:
     ) -> ReadPage[RecoveryCase]:
         with self._scope(token, workspace, OperatorResource.RECOVERY):
             return _page(self.recovery.classify(workspace), limit, cursor)
+
+    def recovery_incidents(
+        self,
+        token: str,
+        workspace: WorkspaceId,
+        *,
+        limit: int = 25,
+        cursor: str | None = None,
+    ) -> ReadPage[RecoveryIncidentSummary]:
+        page = self.recovery_cases(token, workspace, limit=limit, cursor=cursor)
+        categories = {
+            "agent_run": "runs",
+            "task_attempt": "attempts",
+            "execution": "executions",
+            "orchestration_run": "orchestrations",
+            "action_intent": "intents",
+            "tool_invocation": "invocations",
+        }
+        return ReadPage(
+            tuple(
+                RecoveryIncidentSummary(
+                    c.subject_type,
+                    c.subject_id,
+                    c.reason.value,
+                    c.outcome,
+                    RECOVERY_TEXT[c.reason.value],
+                    (InspectionLink("Related record", categories[c.subject_type], c.subject_id),),
+                )
+                for c in page.items
+            ),
+            page.next_cursor,
+        )

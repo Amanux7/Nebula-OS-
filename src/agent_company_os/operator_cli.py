@@ -9,7 +9,7 @@ from pathlib import Path
 
 from agent_company_os.adapters.clocks import SystemClock
 from agent_company_os.adapters.fake_model import FakeModel
-from agent_company_os.adapters.ids import SystemIdGenerator
+from agent_company_os.adapters.ids import DeterministicIdGenerator
 from agent_company_os.adapters.knowledge_ingestion import TextKnowledgeIngestor
 from agent_company_os.adapters.lexical_memory import LexicalMemoryRetriever
 from agent_company_os.adapters.lexical_retrieval import LexicalKnowledgeRetriever
@@ -70,9 +70,12 @@ from agent_company_os.domain.organization import (
     CapabilityDefinition,
     Department,
     DepartmentMembership,
+    DepartmentRoute,
     OrganizationGraphVersion,
+    OrganizationPolicy,
     OrgRole,
     RegisteredAgent,
+    RouteKind,
 )
 from agent_company_os.domain.tools import (
     ExecutorKind,
@@ -82,15 +85,16 @@ from agent_company_os.domain.tools import (
     ToolVersion,
 )
 from agent_company_os.operator_host import HostConfig, create_server
+from agent_company_os.operator_scenario import seed_collaboration
 
 
-def seed_aurora(path: Path) -> WorkspaceId:
+def seed_aurora(path: Path, *, inspection_marker: str | None = None) -> WorkspaceId:
     """Create clearly synthetic records using the same application commands as tests."""
     group = SqliteStoreGroup(path)
     try:
         if group.domain.workspaces():
             raise InvariantViolation("seed_requires_empty_canonical_database")
-        clock, ids = SystemClock(), SystemIdGenerator()
+        clock, ids = SystemClock(), DeterministicIdGenerator("aurora")
         domain = DomainService(group.domain, clock, ids)
         workspace = domain.create_workspace("Aurora Desk · synthetic demo")
         ws = workspace.id
@@ -100,7 +104,7 @@ def seed_aurora(path: Path) -> WorkspaceId:
         knowledge.publish_source(
             PublishKnowledgeSource(
                 ws,
-                "Approved competitor brief notes",
+                inspection_marker or "Approved competitor brief notes",
                 SourceType.TEXT,
                 TrustClass.APPROVED_INTERNAL,
                 b"Aurora Desk is a synthetic Stage 11 inspection fixture. "
@@ -127,17 +131,28 @@ def seed_aurora(path: Path) -> WorkspaceId:
         capabilities = tuple(
             CapabilityDefinition(ids.capability_id(), ws, name.lower()) for name in names
         )
-        departments = tuple(Department(ids.department_id(), ws, name) for name in names)
+        departments = tuple(
+            Department(ids.department_id(), ws, name, description=inspection_marker or "")
+            for name in names
+        )
         roles = tuple(OrgRole(ids.org_role_id(), ws, name.lower()) for name in names)
         definitions = []
         for index, name in enumerate(names):
             definition = research_brief_agent(ws, AgentDefinitionId(str(ids.event_id())))
             definition = replace(
                 definition,
-                definition=AgentDefinition(definition.definition.id, ws, f"{name} Specialist"),
+                definition=AgentDefinition(
+                    definition.definition.id,
+                    ws,
+                    ("Research Agent", "Product Analyst", "Marketing Writer")[index],
+                ),
                 role=name.lower(),
                 capabilities=(name.lower(),),
-                capability_ids=(capabilities[index].id,),
+                capability_ids=(capabilities[index].id, capabilities[0].id)
+                if index == 1
+                else (capabilities[index].id,),
+                communication_enabled=True,
+                allowed_recipient_roles=("research", "product", "marketing"),
             )
             if name == "Marketing":
                 definition = replace(
@@ -167,6 +182,15 @@ def seed_aurora(path: Path) -> WorkspaceId:
                 DepartmentMembership(ws, d.definition.id, departments[i].id, roles[i].id)
                 for i, d in enumerate(definitions)
             ),
+            policy=OrganizationPolicy(
+                tuple(
+                    DepartmentRoute(a.id, b.id, route, True)
+                    for a in departments
+                    for b in departments
+                    if a != b
+                    for route in RouteKind
+                )
+            ),
         )
         org.publish(version, graph.revision)
         current = group.organization.graph(ws)
@@ -191,7 +215,7 @@ def seed_aurora(path: Path) -> WorkspaceId:
             )
             attempt = domain.start_task_attempt(attempt.id, attempt.version)
             if index == 0:
-                fact = Fact("pricing", "Synthetic $49", "fixture-statement")
+                fact = Fact("pricing", inspection_marker or "Synthetic $49", "fixture-statement")
                 completion = json.dumps(
                     {
                         "schema_version": 1,
@@ -227,7 +251,7 @@ def seed_aurora(path: Path) -> WorkspaceId:
                 source_run.id,
                 MemoryType.EPISODIC,
                 "Aurora demo customer",
-                "Synthetic $49",
+                inspection_marker or "Synthetic $49",
                 MemoryScope(MemoryScopeKind.CUSTOMER, "paper-kite"),
                 MemoryProvenance(
                     MemoryProvenanceKind.USER_STATEMENT,
@@ -236,7 +260,7 @@ def seed_aurora(path: Path) -> WorkspaceId:
                     MemoryAuthority.STATED,
                 ),
                 claim_key="pricing",
-                claim_value="Synthetic $49",
+                claim_value=inspection_marker or "Synthetic $49",
             )
         )
         memory.approve(ws, candidate.id, candidate.version, "synthetic-reviewer")
@@ -312,6 +336,7 @@ def seed_aurora(path: Path) -> WorkspaceId:
                     ws, intent.intent.id, intent.intent.fingerprint, reviewer, DecisionKind.APPROVED
                 )
                 asyncio.run(runtime.resume_approval(ws, run.id, intent.intent.id, run.version))
+        seed_collaboration(group, ws, clock, ids, departments, capabilities, inspection_marker)
         fixture_executor.close()
         return ws
     finally:

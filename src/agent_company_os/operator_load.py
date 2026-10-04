@@ -1,11 +1,14 @@
 """Repeatable, offline Stage 11 query measurement; not a production SLO."""
 
 import argparse
+import cProfile
 import json
 from collections.abc import Callable
 from pathlib import Path
+from pstats import Stats
 from statistics import median
 from time import perf_counter
+from typing import Any, cast
 
 from agent_company_os.adapters.clocks import SystemClock
 from agent_company_os.adapters.ids import SystemIdGenerator
@@ -35,7 +38,10 @@ def measure(canonical: Path, identity: Path, extra_goals: int = 200) -> dict[str
     migrate_database(canonical)
     migrate_operator_database(identity)
     workspace = seed_aurora(canonical)
-    group, accounts = SqliteStoreGroup(canonical), SqliteOperatorStore(identity)
+    group, accounts = (
+        SqliteStoreGroup(canonical, inspection_limit=10_000),
+        SqliteOperatorStore(identity),
+    )
     try:
         clock, ids = SystemClock(), SystemIdGenerator()
         domain = DomainService(group.domain, clock, ids)
@@ -71,6 +77,8 @@ def measure(canonical: Path, identity: Path, extra_goals: int = 200) -> dict[str
             ),
             "agent_run_detail": lambda: queries.run(token, workspace, run_id),
             "organization": lambda: queries.inspect(token, workspace, "departments"),
+            "approval_list": lambda: queries.inspect(token, workspace, "approvals"),
+            "tool_invocation_list": lambda: queries.inspect(token, workspace, "invocations"),
             "recovery_scan": lambda: queries.recovery_cases(token, workspace),
             "goal_timeline": lambda: queries.goal_timeline(token, workspace, first_goal),
         }
@@ -82,6 +90,21 @@ def measure(canonical: Path, identity: Path, extra_goals: int = 200) -> dict[str
                 operation()
                 samples.append(round((perf_counter() - before) * 1000, 3))
             timings[name] = {"first_ms": samples[0], "warm_median_ms": median(samples[1:])}
+        profile = cProfile.Profile()
+        profile.runcall(paths["goal_detail"])
+        stats = Stats(profile)
+        profile_rows = [
+            {
+                "function": f"{Path(key[0]).name}:{key[2]}",
+                "calls": value[1],
+                "self_ms": round(value[2] * 1000, 3),
+                "cumulative_ms": round(value[3] * 1000, 3),
+            }
+            for key, value in sorted(
+                cast(Any, stats).stats.items(), key=lambda row: row[1][3], reverse=True
+            )
+            if key[2] in ("_load", "_flush", "decode_record", "encode_record", "records", "_decode")
+        ]
         query_plan = group.connection.execute(
             "EXPLAIN QUERY PLAN SELECT id FROM domain_records "
             "WHERE workspace_id=? AND kind='goal' ORDER BY id LIMIT 25",
@@ -104,6 +127,8 @@ def measure(canonical: Path, identity: Path, extra_goals: int = 200) -> dict[str
             "counts": counts,
             "timings": timings,
             "query_plan": [list(row) for row in query_plan],
+            "profile_goal_detail": profile_rows,
+            "inspection_limits": {"records": 10000, "bytes": 33554432, "record_bytes": 1048576},
             "runs_per_query": 4,
             "assumption": "same local process and SQLite file; first then three warm reads",
         }

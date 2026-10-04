@@ -190,7 +190,15 @@ def test_aurora_fixture_uses_canonical_services(tmp_path: Path) -> None:
         assert len(group.domain.tasks_for_goal(goals[0].id)) >= 1
         assert len(group.runtime.definitions(workspace)) == 3
         assert len(group.organization.versions(workspace)[0].departments) == 3
-        assert len(group.runtime.runs(workspace)) == 4
+        assert len(group.runtime.runs(workspace)) == 8
+        catalog = SqliteInspectionCatalog(group)
+        assert len(catalog.records(workspace, "plans")) == 1
+        assert len(catalog.records(workspace, "materializations")) == 1
+        assert len(catalog.records(workspace, "delegations")) == 4
+        assert len(catalog.records(workspace, "delegation_attempts")) == 4
+        assert catalog.records(workspace, "messages")
+        assert dict(catalog.records(workspace, "handoffs")[0].fields)["status"] == "completed"
+        assert catalog.records(workspace, "results")
         assert len(group.runtime.governed_actions(workspace)) == 2
         assert len(SqliteInspectionCatalog(group).records(workspace, "invocations")) == 1
         assert len(SqliteInspectionCatalog(group).records(workspace, "receipts")) == 1
@@ -247,3 +255,47 @@ def test_operator_read_waits_for_canonical_commit(tmp_path: Path) -> None:
     finally:
         accounts.close()
         writer.close()
+
+
+def test_local_login_rate_limit_and_safe_diagnostics(site: tuple[int, str, str, str, str]) -> None:
+    port, admin, _viewer, _goal, _foreign = site
+    cookie = login(port, admin)
+    for _ in range(4):
+        assert (
+            request(
+                port,
+                "POST",
+                "/api/v1/login",
+                {"credential": "0" * 64},
+                origin=f"http://127.0.0.1:{port}",
+            )[0]
+            == 401
+        )
+    assert (
+        request(
+            port, "POST", "/api/v1/login", {"credential": admin}, origin=f"http://127.0.0.1:{port}"
+        )[0]
+        == 429
+    )
+    status, _, body = request(port, "GET", "/api/v1/diagnostics", cookie=cookie)
+    assert status == 200
+    data = json.loads(body)
+    assert data["requests"]["authentication_failures"] == 4
+    assert data["startup"]["mode"] == "normal"
+    assert "modes" not in data["startup"]  # no other workspace state
+    assert admin not in body.decode() and cookie.split("=", 1)[1] not in body.decode()
+
+
+def test_duplicate_host_header_denied(site: tuple[int, str, str, str, str]) -> None:
+    port = site[0]
+    connection = HTTPConnection("127.0.0.1", port, timeout=10)
+    try:
+        connection.putrequest("GET", "/health/live", skip_host=True)
+        connection.putheader("Host", f"127.0.0.1:{port}")
+        connection.putheader("Host", "attacker.example")
+        connection.endheaders()
+        response = connection.getresponse()
+        assert response.status == 403
+        assert b"attacker" not in response.read()
+    finally:
+        connection.close()

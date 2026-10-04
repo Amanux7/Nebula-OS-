@@ -167,18 +167,19 @@ Stages are capability gates, not calendar estimates. A later stage begins only w
 - **Scope update (2026-09-21):** the authorized Stage 11 brief replaces the earlier
   evaluation milestone with operator authentication/authorization, a real read-only
   host and console, safe backup/restore quarantine, diagnostics and measured queries.
-- **Implemented checkpoint:** local generated-token accounts and expiring sessions,
+- **Implemented:** local generated-token accounts and expiring sessions,
   scoped role policy, audited account disable/logout, separate SQLite identity store,
-  initial authenticated Goal/Task/AgentRun/audit/recovery query DTOs, redacted
+  authenticated Goal/Task/AgentRun/audit/recovery and structural lineage DTOs, redacted
   canonical inspection metadata, and migration 003's durable mode restriction at
   the consequential dispatch claim. SQLite backup/fresh restore adapters quarantine
   a restored workspace before the database is published.
-- **Still required:** HTTP composition, full inspection views, seed scenarios, health/
-  readiness, stale-backup and remote-ledger drills, UI security tests, load
-  measurements and the complete acceptance gate.
+- **Final evidence:** loopback HTTP/console, canonical collaboration seed, health/
+  readiness and diagnostics, migration 004 restore provenance/intent holds, audited
+  admin release, stale-backup/remote-ledger drills, browser CSP/XSS tests, measured
+  load and tested pre-decode limits. 574 tests pass; full evidence is in the report.
 - **Do not build:** agent/organization editors, approval write UI, production
   integrations, broader autonomy, SSO claims or distributed infrastructure.
-- **Status:** INCOMPLETE. See [Stage 11 checkpoint](../STAGE_11_REPORT.md) and ADR-014.
+- **Status:** PASS for local/offline scope. See [Stage 11 report](../STAGE_11_REPORT.md) and ADR-014.
   Former live-model evaluation goals remain deferred, not silently marked complete.
 
 ## Stage 12 — External integrations
@@ -201,8 +202,9 @@ Stages are capability gates, not calendar estimates. A later stage begins only w
 
 ## Immediate next milestone
 
-Stage 10 adds tested local durability, fixture reconciliation and scoped audit reads.
-Continue the authorized Stage 11 scope from its identity/query checkpoint. Build
-the HTTP host and safe restore quarantine before claiming an operational console.
-Production authentication, real connector safety, power-loss reliability and
-distributed takeover remain unproven. No production write integration has been added.
+Stage 11 adds the tested local operator console, safe restore/release and bounded
+inspection. Recommend scoping Stage 12 around operator usability/accessibility,
+read-model performance, production identity/runbooks and worker fencing before the
+historical external-integration roadmap is attempted. Production authentication,
+connector safety, power-loss reliability and distributed takeover remain unproven.
+No Stage 12 code or production write integration has been added.

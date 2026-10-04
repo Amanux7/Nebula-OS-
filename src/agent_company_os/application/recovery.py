@@ -88,7 +88,7 @@ class RecoveryService:
                         reason = RecoveryReason.CANCELLED
                     elif self.clock.now() >= record.intent.expires_at:
                         reason = RecoveryReason.EXPIRED
-                    elif (
+                    elif self.store.intent_held(workspace, record.intent.id) or (
                         record.decisions and record.decisions[-1].kind is not DecisionKind.APPROVED
                     ):
                         reason = RecoveryReason.MANUAL_REVIEW
@@ -103,7 +103,9 @@ class RecoveryService:
                             "action_intent",
                             str(record.intent.id),
                             reason,
-                            "not_executed",
+                            "outcome_unknown"
+                            if self.store.intent_held(workspace, record.intent.id)
+                            else "not_executed",
                         )
                     )
             # Include claims of terminal runs too: cancellation does not establish remote outcome.

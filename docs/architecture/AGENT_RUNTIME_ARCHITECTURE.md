@@ -1,5 +1,21 @@
 # Agent Runtime Architecture
 
+## Stage 11 inspection and restored authority
+
+The inspection host never drives AgentRuns. A narrow start_delegation application
+seam allows the synthetic collaboration fixture to claim existing delegated work
+without calling a model immediately. Optional existing Execution selection checks
+workspace, Goal and running status; one active run per Execution, normal parent/
+version checks and budgets still apply. No scheduler or new AI capability is added.
+
+Tool Runtime checks operational mode and exact restored-intent hold inside the
+same canonical transaction as dispatch ownership. This check supplements approval,
+Tool grants and current policy; it does not replace them. Old approved snapshots
+stay blocked after admin quarantine release. A known persisted claim can still be
+reconciled against independent remote evidence without dispatch. A snapshot taken
+before a claim may not contain its lookup key; do not infer a safe retry or invent
+a receipt. Recovery and release never reset absolute deadlines or counters.
+
 ## Stage 10 restart behavior
 
 RuntimeStore has both in-memory and SQLite implementations. Absolute deadlines,

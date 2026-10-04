@@ -261,7 +261,9 @@ class ToolRuntimeService:
             ):
                 raise ModelFailure("tool_budget_exceeded")
             if version.definition.risk is not ToolRisk.READ_ONLY:
-                self.store.require_consequential_dispatch(workspace_id)
+                self.store.require_consequential_dispatch(
+                    workspace_id, governed.intent.id if governed else None
+                )
             normalized = input_json(request)
             claimed = run.evolve(at=self.clock.now())
             self.store.save_run(claimed, run.version, None)

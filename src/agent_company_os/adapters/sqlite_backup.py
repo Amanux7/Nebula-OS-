@@ -32,13 +32,28 @@ def _child(root: Path, name: str) -> Path:
     if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}", name):
         raise InvariantViolation("invalid_backup_name")
     target = root / name
-    if target.is_symlink() or target.resolve().parent != root.resolve():
+    if target.is_symlink() or target.is_junction() or target.resolve().parent != root.resolve():
         raise InvariantViolation("backup_path_escape")
     return target
 
 
+def _reject_links(path: Path) -> None:
+    if any(p.is_symlink() or p.is_junction() for p in (path, *path.parents)):
+        raise InvariantViolation("backup_path_escape")
+
+
+def _cleanup(directory: Path, names: tuple[str, ...]) -> None:
+    # Only exact files in the exclusively created operation directory are removed.
+    for name in names:
+        for suffix in ("", "-journal", "-wal", "-shm"):
+            (directory / (name + suffix)).unlink(missing_ok=True)
+    directory.rmdir()
+
+
 class SqliteBackupAdapter:
     def __init__(self, source: Path, backups: Path, restores: Path) -> None:
+        for path in (source, backups, restores):
+            _reject_links(path)
         self.source, self.backups, self.restores = source, backups.resolve(), restores.resolve()
         if self.backups == self.restores:
             raise InvariantViolation("separate_backup_restore_roots_required")
@@ -50,6 +65,10 @@ class SqliteBackupAdapter:
         # Decode and validate every canonical record, including cross-workspace lineage.
         group = SqliteStoreGroup(path)
         try:
+            if group.connection.execute("PRAGMA quick_check").fetchall() != [("ok",)] or (
+                group.connection.execute("PRAGMA foreign_key_check").fetchall()
+            ):
+                raise InvariantViolation("backup_integrity_failure")
             rows = group.connection.execute(
                 "SELECT id FROM domain_records WHERE kind='workspace' ORDER BY id"
             ).fetchall()
@@ -88,9 +107,7 @@ class SqliteBackupAdapter:
             return manifest
         except Exception:
             # A failed scope check must not leave an unowned plaintext backup.
-            for name_to_remove in ("manifest.json", "canonical.sqlite"):
-                (directory / name_to_remove).unlink(missing_ok=True)
-            directory.rmdir()
+            _cleanup(directory, ("manifest.json", "canonical.sqlite"))
             raise
 
     def restore(
@@ -98,8 +115,8 @@ class SqliteBackupAdapter:
     ) -> BackupManifest:
         directory = _child(self.backups, name)
         manifest_path, snapshot = directory / "manifest.json", directory / "canonical.sqlite"
-        if any(p.is_symlink() for p in (manifest_path, snapshot)):
-            raise InvariantViolation("backup_path_escape")
+        for path in (directory, manifest_path, snapshot):
+            _reject_links(path)
         try:
             if manifest_path.stat().st_size > 4096:
                 raise ValueError("manifest size")
@@ -122,39 +139,60 @@ class SqliteBackupAdapter:
         target_directory.mkdir(mode=0o700)
         # An uncommitted restore is not a host database: publish name only after quarantine.
         staging = target_directory / "restore.incomplete"
-        source = open_database(snapshot)
         try:
-            connection = sqlite3.connect(staging)
+            source = open_database(snapshot)
             try:
-                source.backup(connection)
-                connection.execute("PRAGMA foreign_keys=ON")
-                connection.execute("BEGIN IMMEDIATE")
-                previous = connection.execute(
-                    "SELECT mode FROM operational_modes WHERE workspace_id=?", (str(workspace),)
-                ).fetchone()
-                connection.execute(
-                    "INSERT INTO operational_modes(workspace_id,mode,version) "
-                    "VALUES(?,'restore_quarantine',1) ON CONFLICT(workspace_id) "
-                    "DO UPDATE SET mode='restore_quarantine',version=version+1",
-                    (str(workspace),),
-                )
-                connection.execute(
-                    "INSERT INTO operational_audit"
-                    "(workspace_id,principal_id,previous_mode,mode,timestamp,reason) "
-                    "VALUES(?,?,?,'restore_quarantine',?,'canonical_restore')",
-                    (
-                        str(workspace),
-                        principal,
-                        previous[0] if previous else "normal",
-                        at.isoformat(),
-                    ),
-                )
-                connection.commit()
+                connection = sqlite3.connect(staging)
+                try:
+                    source.backup(connection)
+                finally:
+                    connection.close()
             finally:
-                connection.close()
-        finally:
-            source.close()
-        staging.chmod(0o600)
-        self._scope(staging, workspace)
-        staging.rename(target_directory / "canonical.sqlite")
-        return manifest
+                source.close()
+            staging.chmod(0o600)
+            self._scope(staging, workspace)
+            restored = SqliteStoreGroup(staging)
+            try:
+                with restored.transaction():
+                    connection = restored.connection
+                    generation = connection.execute(
+                        "SELECT COALESCE(MAX(generation),0)+1 FROM restore_incidents"
+                    ).fetchone()[0]
+                    connection.execute(
+                        "INSERT INTO restore_incidents VALUES(?,?,?,?,?,?,?,1)",
+                        (
+                            generation,
+                            str(workspace),
+                            name,
+                            manifest.sha256,
+                            json.dumps(asdict(manifest), sort_keys=True),
+                            at.isoformat(),
+                            principal,
+                        ),
+                    )
+                    for record in restored.runtime.governed_actions(workspace):
+                        connection.execute(
+                            "INSERT OR IGNORE INTO restored_intent_holds VALUES(?,?,?)",
+                            (str(workspace), str(record.intent.id), generation),
+                        )
+                    previous = restored.runtime.operational_mode(workspace).value
+                    connection.execute(
+                        "INSERT INTO operational_modes(workspace_id,mode,version) "
+                        "VALUES(?,'restore_quarantine',1) ON CONFLICT(workspace_id) "
+                        "DO UPDATE SET mode='restore_quarantine',version=version+1",
+                        (str(workspace),),
+                    )
+                    connection.execute(
+                        "INSERT INTO operational_audit"
+                        "(workspace_id,principal_id,previous_mode,mode,timestamp,reason) "
+                        "VALUES(?,?,?,'restore_quarantine',?,'canonical_restore')",
+                        (str(workspace), principal, previous, at.isoformat()),
+                    )
+            finally:
+                restored.close()
+            self._scope(staging, workspace)
+            staging.rename(target_directory / "canonical.sqlite")
+            return manifest
+        except Exception:
+            _cleanup(target_directory, ("restore.incomplete",))
+            raise

@@ -35,7 +35,7 @@ def test_migration_mode_and_read_only_inspection(tmp_path: Path) -> None:
     domain = DomainService(group.domain, clock, DeterministicIdGenerator("ops"))
     workspace = domain.create_workspace("Aurora")
     goal = domain.create_goal(CreateGoalCommand(workspace.id, "<script>alert(1)</script>", ("x",)))
-    assert group.connection.execute("SELECT count(*) FROM schema_migrations").fetchone() == (3,)
+    assert group.connection.execute("SELECT count(*) FROM schema_migrations").fetchone() == (4,)
     catalog = SqliteInspectionCatalog(group)
     assert catalog.records(workspace.id, "goals")[0].id == str(goal.id)
     assert "<script>" in dict(catalog.records(workspace.id, "goals")[0].fields)["objective"]
@@ -95,6 +95,9 @@ def test_authenticated_fresh_restore_quarantines_old_approval_state(tmp_path: Pa
             restored.close()
         with pytest.raises(InvariantViolation, match="invalid_backup_name"):
             backup.restore(session, workspace.id, "../identity.sqlite", "drill-2")
+        assert backup.metrics["create_success"] == 1
+        assert backup.metrics["restore_success"] == 1
+        assert backup.metrics["restore_failure"] == 1
     finally:
         operator_store.close()
         group.close()

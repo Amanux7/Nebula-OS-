@@ -105,10 +105,24 @@ class SqliteRuntimeStore(InMemoryRuntimeStore):
         except ValueError:
             raise InvariantViolation("invalid_operational_mode") from None
 
-    def require_consequential_dispatch(self, workspace_id: WorkspaceId) -> None:
+    def intent_held(self, workspace_id: WorkspaceId, intent_id: g.ActionIntentId) -> bool:
+        self.domain.get_workspace(workspace_id)
+        return (
+            self._durable.connection.execute(
+                "SELECT 1 FROM restored_intent_holds WHERE workspace_id=? AND intent_id=?",
+                (str(workspace_id), str(intent_id)),
+            ).fetchone()
+            is not None
+        )
+
+    def require_consequential_dispatch(
+        self, workspace_id: WorkspaceId, intent_id: g.ActionIntentId | None = None
+    ) -> None:
         """Checked under the SAME transaction that commits the dispatch claim."""
         if self.operational_mode(workspace_id) is not OperationalMode.NORMAL:
             raise InvariantViolation("operational_mode_blocks_consequential_dispatch")
+        if intent_id is not None and self.intent_held(workspace_id, intent_id):
+            raise InvariantViolation("restored_intent_requires_new_work")
 
 
 @_scoped_operations
@@ -251,8 +265,15 @@ class SqliteStoreGroup:
     properties; they do not access this adapter's SQL connection.
     """
 
-    def __init__(self, path: Path, fault: Callable[[str], None] | None = None) -> None:
+    def __init__(
+        self,
+        path: Path,
+        fault: Callable[[str], None] | None = None,
+        *,
+        inspection_limit: int | None = None,
+    ) -> None:
         self.connection = open_database(path)
+        self.inspection_limit = inspection_limit
         self.fault = fault or (lambda phase: None)
         self._lock = RLock()
         self._depth = 0
@@ -472,6 +493,31 @@ class SqliteStoreGroup:
             self.fault("after_commit")
 
     def _load(self) -> tuple[dict[Any, Any], dict[Any, Any], set[Any]]:
+        if self.inspection_limit is not None:
+            # Count bytes/rows BEFORE decoding. LIMIT caps even the preflight scan.
+            remaining, byte_budget = self.inspection_limit, 32 * 1024 * 1024
+            for table in ("domain_records", "domain_audit", "canonical_records"):
+                for (size,) in self.connection.execute(
+                    f"SELECT length(CAST(payload AS BLOB)) FROM {table} LIMIT ?",
+                    (remaining + 1,),
+                ):
+                    remaining -= 1
+                    byte_budget -= size
+                    if remaining < 0 or byte_budget < 0 or size > 1024 * 1024:
+                        raise InvariantViolation("inspection_capacity_exceeded")
+            # Bound relational lineage and safety metadata on the HTTP read path too.
+            for table in (
+                "canonical_links",
+                "restore_incidents",
+                "restored_intent_holds",
+                "quarantine_release_audit",
+                "operational_audit",
+            ):
+                rows = self.connection.execute(
+                    f"SELECT 1 FROM {table} LIMIT ?", (self.inspection_limit * 20 + 1,)
+                ).fetchall()
+                if len(rows) > self.inspection_limit * 20:
+                    raise InvariantViolation("inspection_capacity_exceeded")
         for descriptor in (*self._domain.values(), *self._collections.values()):
             setattr(descriptor.owner, descriptor.attribute, [] if descriptor.sequence else {})
         self.domain._events, self.domain._transitions = [], []

@@ -1,5 +1,24 @@
 # Glossary
 
+## Stage 11 terminology
+
+- **OperatorPrincipal:** local human account identity scoped to a workspace/role;
+  neither an agent nor an approval reviewer by implication.
+- **OperatorQueryService:** authenticated application boundary for safe inspection,
+  lineage, audit and recovery read DTOs.
+- **InspectionLineage:** bounded structural links derived from canonical entities;
+  no raw payload export or authorization authority.
+- **RecoveryIncidentSummary:** explanation and record links for an existing
+  RecoveryCase; not a second recovery state machine.
+- **RestoreContext:** backup digest/manifest schema, time, principal, local generation
+  and held intent identities for a restored workspace.
+- **Restored intent hold:** immutable dispatch denial on each intent in a restored
+  snapshot, independent of its historical approval status.
+- **Quarantine release:** validated, audited admin mode transition; not resume,
+  approval, receipt repair, retry or external rollback.
+- **Inspection capacity:** pre-decode record/byte limits for the local host; page
+  size alone does not bound full-store decoding.
+
 ## Stage 10 terminology
 
 - **SqliteStoreGroup:** one connection/unit of work shared by canonical service adapters.

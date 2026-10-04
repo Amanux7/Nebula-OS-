@@ -1,6 +1,6 @@
 # Security and Permissions
 
-## Stage 11 identity checkpoint (incomplete stage)
+## Stage 11 local operator security
 
 OperatorPrincipal is separate from AgentRun, ReviewerPrincipal and organization roles.
 Local bootstrap generates high-entropy credentials; login exchanges them for bounded
@@ -12,9 +12,30 @@ together. Even admin cannot export protected payloads or authorize Tool executio
 Identity data is separate from canonical backup scope; old application snapshots must
 not restore operator sessions or disabled accounts. Filesystem administrators remain
 trusted. This does not protect against restoring an old identity database or stealing
-a bearer credential. HTTP transport/session hardening, rate limits, restore quarantine,
-and stale-approval restore tests are still required. No console or public server is
-implemented at this checkpoint. See ADR-014 and the Stage 11 report.
+a bearer credential. The loopback-only host requires exact Host/Origin and a custom
+same-origin header for mutation; duplicate sensitive headers and transfer encoding
+are rejected. HttpOnly/SameSite=Strict sessions, CSP, no CORS, no-store/nosniff/frame/
+referrer headers, bounded body/query sizes and five login attempts per minute are
+tested. Four request workers and pre-decode limits bound local resource usage.
+This is not SSO, TLS deployment or a production internet-facing server.
+
+Admin release validates restored canonical state and recovery classification, then
+commits mode plus immutable audit. Every snapshot intent remains separately held;
+stale approvals cannot dispatch after release, even when a later revocation is
+missing from the restored history. Known claims can be reconciled without dispatch;
+unknown results and absent pre-claim lookup identity remain blocked. Audit failure
+rolls back release. Unauthenticated or unavailable-storage failures cannot promise
+durable principal-attributed audit; safe host counters/denial remain.
+
+Backup/restore reject traversal, existing destinations and symlink/junction paths,
+validate schema/digest/canonical state and remove ordinary partial output. Roots
+are trusted local configuration. Checks do not eliminate TOCTOU against a hostile
+filesystem administrator. Backups/manifests are plaintext and unsigned. POSIX mode
+hints are restrictive; Windows chmod is not a private ACL—operators must verify
+parent ACLs. Identity and remote fixture state are excluded from canonical backup.
+An abrupt death can leave private unpublished staging files, requiring trusted
+cleanup. Checksum integrity is not authenticated origin. See ADR-014, the
+[walkthrough](../engineering/OPERATOR_WALKTHROUGH.md) and Stage 11 evidence.
 
 ## Stage 10 durable threat boundary
 

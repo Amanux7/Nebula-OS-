@@ -46,6 +46,7 @@ def test_bootstrap_once_reopen_and_foreign_keys(tmp_path: Path) -> None:
             (1,),
             (2,),
             (3,),
+            (4,),
         ]
         connection.execute("BEGIN IMMEDIATE")
         insert_workspace(connection)
