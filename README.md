@@ -11,7 +11,7 @@ scoped capabilities, and evidence behind every accepted result.
 
 > **AI for judgment. Software for guarantees.**
 
-**Current milestone: Stage 10 — Durable Recovery and Audit Foundations.** The
+**Current milestone: Stage 11 — Local Operator Control Plane and Inspection.** The
 repository implements a deterministic domain foundation, a bounded single-agent
 runtime, controlled read-only tools, source-aware Knowledge, reviewed scoped Memory,
 replaceable orchestration, and governed point-to-point communication with explicit
@@ -24,6 +24,15 @@ state and cross-subsystem history across restart. Deterministic recovery reconci
 known fixture outcomes without redispatch and leaves unknown outcomes blocked.
 It is an early-stage engineering foundation,
 not a deployed autonomous company or a production-ready AI service.
+
+The loopback-only operator console reads real canonical SQLite state through
+authenticated, workspace-scoped metadata queries. Follow Goals through plans,
+delegations, AgentRuns, messages, approvals, and ToolReceipts. Restore incidents
+have an audited admin release workflow; releasing quarantine never resumes work
+or reauthorizes restored intents. This is the actual local inspection platform,
+not the landing page and not a production deployment. See the
+[Stage 11 evidence](docs/STAGE_11_REPORT.md) and
+[operator walkthrough](docs/engineering/OPERATOR_WALKTHROUGH.md).
 
 [Get started](#getting-started) · [Architecture](#architecture) ·
 [Execution flow](#tool-execution-flow) · [Roadmap](#roadmap) ·
@@ -90,7 +99,8 @@ cannot grant permissions, bypass domain invariants, or certify its own success.
 | Governance | Exact payload fingerprints, explicit reviewers, expiry/revocation, one-use approval, and bounded Level 3 fixture execution |
 | Durable recovery | Shared SQLite transactions, explicit migrations, durable dispatch claims, independent fixture ledger, restart classification and receipt reconciliation |
 | Audit queries | Workspace-scoped timelines, approval/invocation views, and structural Goal-to-receipt lineage |
-| Verification | 514 passing offline tests; Ruff formatting/lint, mypy, and whitespace checks pass. See the [Stage 10 report](docs/STAGE_10_REPORT.md) |
+| Operator control plane | Local sessions, scoped inspection/lineage, recovery explanations, restore context and audited quarantine release |
+| Verification | Full offline regression, restore drills, browser CSP/XSS acceptance, and measured bounded queries: [Stage 11 report](docs/STAGE_11_REPORT.md) |
 
 The only supplied agent type is the **Research Brief Agent**. It can operate on
 approved supplied facts or receive an immutable definition upgrade granting the
@@ -101,7 +111,7 @@ scripted; no live LLM provider is wired in.
 
 ### Local durability and inspection
 
-Stage 10 is an offline backend proof, not a product dashboard. The independent
+The independent
 fixture ledger represents an external system; no real message is sent. Run its
 restart demonstrations and safe audit-query tests locally:
 
@@ -117,11 +127,44 @@ after use. Do not mix in-memory stores into a durable transaction graph.
 `AuditQueryService(group.runtime, orchestration=group.orchestration)` exposes
 Goal/Task/AgentRun/intent timelines, task approvals, execution invocations and
 Goal-to-receipt traces. Every query requires workspace scope. It is a safe seam
-for a separately scoped future inspection UI; the landing page is not the platform.
+used by the local inspection UI; the landing page is not the platform.
 
 Recovery never automatically dispatches: a missing receipt means uncertainty,
 not permission to retry. See [ADR-013](docs/architecture/ADR/ADR-013-durable-state-recovery-and-audit.md)
 and the [Stage 10 report](docs/STAGE_10_REPORT.md) for tested guarantees and limits.
+
+For the Stage 11 local inspection preview, use the repository virtual environment:
+
+```powershell
+.\.venv\Scripts\python.exe -m agent_company_os.operator_cli bootstrap --canonical .local/aurora.sqlite --identity .local/operators.sqlite
+.\.venv\Scripts\python.exe -m agent_company_os.operator_cli seed-aurora --canonical .local/aurora.sqlite --identity .local/operators.sqlite
+.\.venv\Scripts\python.exe -m agent_company_os.operator_cli provision --canonical .local/aurora.sqlite --identity .local/operators.sqlite --workspace aurora-workspace-0001 --operator local-auditor --role auditor
+.\.venv\Scripts\python.exe -m agent_company_os.operator_cli serve --canonical .local/aurora.sqlite --identity .local/operators.sqlite --port 8787
+```
+
+Open `http://127.0.0.1:8787/` and enter the one-time credential printed by
+provisioning. Use fresh local database paths for a new demo; seeding is not an
+idempotent production bootstrap. The host binds only to loopback and has no
+agent worker or external connector. Do not publish the credential or expose the
+port to a network.
+
+The seed includes Research Agent, Product Analyst and Marketing Writer, a complete
+cross-department plan/handoff, Knowledge and Memory, pending and consumed approvals,
+and fixture receipts. Follow the walkthrough for backup/restore drills; only a
+separately provisioned admin can release quarantine. There is no approval editor.
+
+```mermaid
+flowchart LR
+    Human[Local operator] --> Session[Local credential / expiring session]
+    Session --> Query[Authenticated query DTOs]
+    Query --> DB[(Canonical SQLite)]
+    Query --> Console[Inspection and lineage console]
+    DB --> Backup[Plaintext snapshot + manifest]
+    Backup --> Restore[Fresh restore / quarantine]
+    Restore --> Validate[Integrity + recovery classification]
+    Validate --> Release[Audited admin release]
+    Release --> Held[Old intents remain blocked / no dispatch]
+```
 
 The implemented architecture is a **modular Python application**, not a microservice
 deployment. These are logical responsibilities, not separately deployed services.
@@ -516,7 +559,7 @@ bounded retrieval, and combined knowledge/tool evidence without network calls.
 | 8 | Departments, registry, and organization graph | Implemented and verified offline |
 | 9 | Human approval and consequential-action governance | Implemented and verified offline |
 | 10 | Reliability, recovery, and audit-query foundations | Implemented and verified locally/offline |
-| 11 | Operator control plane, restore drills, and read-only inspection | Next scope; not yet implemented |
+| 11 | Operator control plane, restore drills, and read-only inspection | Implemented locally; evidence and verdict in Stage 11 report |
 | Later | Observability/approval UI, evaluations, integrations, and production | Deferred pending evidence |
 
 Stages are evidence gates, not release dates. Planning may eventually be deterministic,

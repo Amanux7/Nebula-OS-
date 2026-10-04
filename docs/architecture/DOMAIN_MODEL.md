@@ -1,5 +1,29 @@
 # Domain Model
 
+## Stage 11 operator and restore semantics
+
+OperatorPrincipal/OperatorId, account and session are human control-plane concepts,
+not AgentDefinition, AgentRun or ReviewerPrincipal. Workspace-bound roles never
+grant Tool permission. InspectionRecord, InspectionLink, InspectionLineage and
+RecoveryIncidentSummary are derived read DTOs, not new canonical execution entities.
+Task-result summaries derive from successful AgentRun results and retain exact
+Task/attempt/run/version identity; protected result text is omitted.
+
+OperationalMode is normal, maintenance or restore_quarantine. RestoreContext
+projects immutable backup/manifest/generation provenance and restored-intent holds.
+ReleaseResult and ReleaseAudit describe validated mode release and its evidence.
+The canonical release audit stores workspace, principal, generation, time, old/new
+mode, success, reason and classification/hold counts. Every authenticated same-scope
+release attempt reaching a healthy store records an outcome, including role denial.
+Unavailable/corrupt storage fails closed; it cannot promise a durable failure audit.
+
+A restored intent hold is an additional, permanent Stage 11 denial, not a change to
+the historical approval. No hold-removal API exists. Releasing quarantine never
+resumes work, changes approval, dispatches a Tool, repairs a receipt or completes a
+Task. Unknown outcomes may coexist with normal mode only while their original work
+remains individually blocked. A restored unclaimed intent cannot prove non-execution
+in the original timeline and is classified outcome_unknown.
+
 ## Stage 10 durable recovery semantics
 
 Canonical entity state is directly persisted; Events remain append-only audit

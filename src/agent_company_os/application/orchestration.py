@@ -30,7 +30,7 @@ from agent_company_os.domain.events import Event, EventType
 from agent_company_os.domain.execution import ExecutionStatus
 from agent_company_os.domain.goal import GoalStatus
 from agent_company_os.domain.governance import ActionIntentId
-from agent_company_os.domain.ids import GoalId, TaskId, Version, WorkspaceId
+from agent_company_os.domain.ids import ExecutionId, GoalId, TaskId, Version, WorkspaceId
 from agent_company_os.domain.orchestration import (
     AgentCatalogItem,
     AgentRequirements,
@@ -752,6 +752,23 @@ class OrchestrationService:
         expected: Version,
         context: SuppliedContext,
     ) -> AgentRun:
+        agent_run = self.start_delegation(
+            workspace_id, orchestration_run_id, delegation_id, expected, context
+        )
+        result = await self.runtime.drive(workspace_id, agent_run.id, agent_run.version)
+        return self._reconcile_result(workspace_id, orchestration_run_id, result)
+
+    def start_delegation(
+        self,
+        workspace_id: WorkspaceId,
+        orchestration_run_id: OrchestrationRunId,
+        delegation_id: DelegationId,
+        expected: Version,
+        context: SuppliedContext,
+        *,
+        execution_id: ExecutionId | None = None,
+    ) -> AgentRun:
+        """Claim bounded child work without driving a model; execute composes this seam."""
         with self.store.atomic():
             orchestration = self.store.run(workspace_id, orchestration_run_id)
             self._version(orchestration, expected)
@@ -777,11 +794,19 @@ class OrchestrationService:
             if task.status is TaskStatus.PROPOSED:
                 task = self.domain.ready_task(task.id, task.version)
             task = self.domain.start_task(task.id, task.version)
+            selected_execution_id = execution_id or orchestration.execution_id
             execution = (
-                self.store.runtime.domain.get_execution(orchestration.execution_id)
-                if orchestration.execution_id
+                self.store.runtime.domain.get_execution(selected_execution_id)
+                if selected_execution_id
                 else None
             )
+            if execution_id is not None and (
+                execution is None
+                or execution.workspace_id != workspace_id
+                or execution.goal_id != orchestration.goal_id
+                or execution.status is not ExecutionStatus.RUNNING
+            ):
+                raise InvariantViolation("delegation_execution_scope")
             if execution is None or execution.status in {
                 ExecutionStatus.SUCCEEDED,
                 ExecutionStatus.FAILED,
@@ -820,8 +845,7 @@ class OrchestrationService:
             current = self.store.run(workspace_id, orchestration.id)
             counted = current.evolve(at=self.clock.now(), agent_run_delta=1)
             self.store.save_run(counted, current.version)
-        result = await self.runtime.drive(workspace_id, agent_run.id, agent_run.version)
-        return self._reconcile_result(workspace_id, orchestration_run_id, result)
+        return agent_run
 
     async def resume_delegation(
         self,

@@ -1,5 +1,21 @@
 # Agent Evaluation Strategy
 
+## Stage 11 operator evidence
+
+Acceptance evaluates observability and control, not model intelligence: inspect
+real Aurora Desk lineage; restore to quarantine; deny old authority; release only
+through validation plus audit; reconcile an independent known remote effect once;
+leave unknown outcomes blocked. Browser tests use persisted hostile-looking text,
+not only static source checks. See the report for exact test and load results.
+
+The 200-extra-goal/1,000-extra-task fixture measures eight query paths, four reads
+each (first plus three warm). Observed warm medians are about 1.4–1.8 seconds in the
+recorded run. Profiling shows full decode/validation and encoding dominate the
+indexed metadata lookup opportunity. Stage 11 chooses tested decode/byte bounds,
+not a production SLO or an unproven projection redesign. Future evaluation should
+measure actual user task completion, usability/accessibility, latency distributions,
+large-history scaling, sustained contention, recovery time and real incident drills.
+
 ## Stage 10 reliability evidence
 
 The offline reliability slice evaluates explicit crash boundaries, not agent

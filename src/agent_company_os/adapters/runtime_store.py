@@ -24,6 +24,7 @@ from agent_company_os.domain.errors import (
 from agent_company_os.domain.events import Event
 from agent_company_os.domain.governance import ActionIntentId, ApprovalPolicy, GovernedAction
 from agent_company_os.domain.ids import TaskAttemptId, Version, WorkspaceId
+from agent_company_os.domain.operations import OperationalMode
 from agent_company_os.domain.tools import (
     ToolInvocation,
     ToolInvocationId,
@@ -35,6 +36,20 @@ from agent_company_os.domain.transitions import StateTransition, SubjectType
 
 
 class InMemoryRuntimeStore:
+    def operational_mode(self, workspace_id: WorkspaceId) -> OperationalMode:
+        self.domain.get_workspace(workspace_id)
+        return OperationalMode.NORMAL
+
+    def intent_held(self, workspace_id: WorkspaceId, intent_id: ActionIntentId) -> bool:
+        self.domain.get_workspace(workspace_id)
+        return False
+
+    def require_consequential_dispatch(
+        self, workspace_id: WorkspaceId, intent_id: ActionIntentId | None = None
+    ) -> None:
+        """Ephemeral unit-test store has no restored state or maintenance mode."""
+        self.domain.get_workspace(workspace_id)
+
     def runs(self, workspace_id: WorkspaceId) -> tuple[AgentRun, ...]:
         self.domain.get_workspace(workspace_id)
         return tuple(run for run in self._runs.values() if run.workspace_id == workspace_id)

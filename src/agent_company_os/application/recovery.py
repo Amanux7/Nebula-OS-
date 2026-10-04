@@ -11,6 +11,7 @@ from agent_company_os.domain.errors import InvariantViolation
 from agent_company_os.domain.events import Event, EventType
 from agent_company_os.domain.governance import DecisionKind
 from agent_company_os.domain.ids import WorkspaceId
+from agent_company_os.domain.operations import OperationalMode
 from agent_company_os.domain.recovery import (
     RecoveryCase,
     RecoveryReason,
@@ -87,9 +88,14 @@ class RecoveryService:
                         reason = RecoveryReason.CANCELLED
                     elif self.clock.now() >= record.intent.expires_at:
                         reason = RecoveryReason.EXPIRED
-                    elif (
+                    elif self.store.intent_held(workspace, record.intent.id) or (
                         record.decisions and record.decisions[-1].kind is not DecisionKind.APPROVED
                     ):
+                        reason = RecoveryReason.MANUAL_REVIEW
+                    elif (
+                        self.store.operational_mode(workspace) is OperationalMode.RESTORE_QUARANTINE
+                    ):
+                        # An old snapshot cannot know if remote effects followed it.
                         reason = RecoveryReason.MANUAL_REVIEW
                     cases.append(
                         RecoveryCase(
@@ -97,7 +103,9 @@ class RecoveryService:
                             "action_intent",
                             str(record.intent.id),
                             reason,
-                            "not_executed",
+                            "outcome_unknown"
+                            if self.store.intent_held(workspace, record.intent.id)
+                            else "not_executed",
                         )
                     )
             # Include claims of terminal runs too: cancellation does not establish remote outcome.

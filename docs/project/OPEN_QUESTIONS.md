@@ -1,5 +1,28 @@
 # Open Questions
 
+## Stage 11 resolutions and remaining work
+
+Local provisioned operator identity, expiring sessions, scoped read DTOs, real
+loopback console, restore provenance, immutable restored-intent holds and audited
+admin quarantine release are implemented. Five login attempts per minute and
+bounded request workers are an explicit local decision. Canonical query reads have
+tested pre-decode bounds; production throughput remains unresolved. The earlier
+Stage 10/9 questions below are historical, superseded only where this paragraph
+and ADR-014 explicitly provide evidence.
+
+Still open: production identity/TLS/credential lifecycle; authenticated operational
+reconciliation beyond local host code; emergency worker quiescence/fencing; a
+reviewed protocol for creating replacement work after investigating held intents;
+missing lookup identity when a snapshot predates dispatch; encrypted/authenticated
+backups and Windows ACL administration; identity disaster recovery; sustained load,
+power-loss guarantees, pagination snapshots and measured RPO/RTO. New projections
+must remain rebuildable and must not authorize actions.
+
+Recommended Stage 12 scope: evaluate operator usability/accessibility and targeted
+read-model performance, define production identity and operational runbooks, and
+prove worker fencing before any real write connector. This is a recommendation
+only; no Stage 12 implementation or integration is authorized by Stage 11.
+
 ## Stage 10 resolutions and remaining questions
 
 ADR-013 selects SQLite for the local durability/recovery proof; runtime and

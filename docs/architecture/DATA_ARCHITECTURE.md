@@ -1,5 +1,29 @@
 # Data Architecture
 
+## Stage 11 control-plane persistence
+
+Canonical migrations 003/004 add operational modes/audit and immutable
+restore_incidents, restored_intent_holds and quarantine_release_audit. Explicit
+bootstrap applies migration checksums before host opening. Release mode and audit
+commit in one canonical transaction; failed audit persistence rolls back release.
+Generation is local to a restored lineage, not a globally unique distributed epoch.
+
+Operator accounts, credential/session digests and identity audit live in separate
+operator_001 SQLite state. Canonical backup never includes that database or the
+fixture remote ledger. Backup uses SQLite's snapshot API, validates a single
+authorized workspace, writes a bounded manifest with digest/schema, and refuses
+existing destinations. Restore validates the snapshot, adds provenance/quarantine/
+holds in a staging file, then publishes canonical.sqlite. Ordinary failures clean
+exact partial files; process death can leave private unpublished staging output.
+
+Inspection uses canonical validation plus explicit allowlisted scalar projections.
+No denormalized authorization truth or inspection index was introduced. The HTTP
+composition preflights at most 10,000 canonical/audit payload records, 32 MiB total
+and 1 MiB per record before decoding; auxiliary tables have a 20x row cap.
+Results page at 1–100; lineage sections cap at 100. These are local safety bounds,
+not a claim that full-read/encode transactions scale to production workloads.
+Plaintext backup confidentiality depends on filesystem controls, not the checksum.
+
 ## Stage 10 implemented persistence
 
 SQLite is selected by ADR-013 for local durability. Explicit migrations

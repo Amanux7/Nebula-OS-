@@ -1,5 +1,23 @@
 # Observability Strategy
 
+## Stage 11 local diagnostics
+
+Host startup records open success, duration, both schema versions and per-workspace
+mode/recovery counts without dispatch. Admin diagnostics expose only the caller's
+workspace startup state plus process-level HTTP counters: requests, authentication/
+authorization failures, response classes and cumulative request/read durations.
+Counters have fixed keys and no user-controlled metric labels; they reset on restart.
+BackupService separately counts create/restore success/failure and cumulative
+duration for its local invocation. It is not a hosted backup endpoint.
+
+Immutable restore provenance and quarantine release audit preserve principal,
+generation, old/new mode, outcome, safe reason and validation counts. Failed
+unauthenticated requests have no invented principal; process counters record denial.
+Storage failure rolls back a release; durable failure evidence cannot be guaranteed
+when its destination is unavailable. Neither credentials, cookies, payloads nor
+reviewer free text are logged. Default HTTP access logging is disabled. The host
+does not claim external telemetry delivery, alerting, production readiness or RPO/RTO.
+
 ## Stage 10 recovery and audit queries
 
 Canonical recovery_detected, recovery_lookup, recovery_receipt_reconciled and

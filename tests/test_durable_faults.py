@@ -30,7 +30,7 @@ def test_migration_sequence_requires_explicit_upgrade(tmp_path, monkeypatch):
     sqlite_database.migrate_database(path)
     sqlite_database.migrate_database(path)
     graph = SqliteStoreGroup(path)
-    assert graph.connection.execute("SELECT count(*) FROM schema_migrations").fetchone() == (2,)
+    assert graph.connection.execute("SELECT count(*) FROM schema_migrations").fetchone() == (4,)
     graph.close()
 
 

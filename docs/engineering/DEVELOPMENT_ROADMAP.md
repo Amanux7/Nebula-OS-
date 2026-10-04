@@ -162,14 +162,25 @@ Stages are capability gates, not calendar estimates. A later stage begins only w
 - **Former UI milestone:** execution graphs, approval views, accessibility, and timeline projections remain useful later work over proven canonical records.
 - **Status:** PASS for the local/offline scope on 2026-09-17: 514 tests, Ruff, mypy and whitespace checks pass. The Stage 10 report records the evidence and limitations.
 
-## Stage 11 — Evaluations and reliability hardening
+## Stage 11 — Operator control plane, restore drills, and read-only inspection
 
-- **Objective:** prevent behavioral regressions and quantify readiness.
-- **Build:** versioned datasets/evaluators, offline runner, sampled online evaluation, comparison gates, adversarial suites, reliability/load/chaos work.
-- **Do not build:** one opaque quality score or live-model dependency for every test.
-- **Tests required:** evaluator validity/repeatability, dataset leakage, regression gates, provider outages, recovery/load tests.
-- **Completion criteria:** MVP targets have evidence, critical regressions block promotion, failure budgets are understood.
-- **Questions answered:** release thresholds, sampling, human calibration, provider/model routing.
+- **Scope update (2026-09-21):** the authorized Stage 11 brief replaces the earlier
+  evaluation milestone with operator authentication/authorization, a real read-only
+  host and console, safe backup/restore quarantine, diagnostics and measured queries.
+- **Implemented:** local generated-token accounts and expiring sessions,
+  scoped role policy, audited account disable/logout, separate SQLite identity store,
+  authenticated Goal/Task/AgentRun/audit/recovery and structural lineage DTOs, redacted
+  canonical inspection metadata, and migration 003's durable mode restriction at
+  the consequential dispatch claim. SQLite backup/fresh restore adapters quarantine
+  a restored workspace before the database is published.
+- **Final evidence:** loopback HTTP/console, canonical collaboration seed, health/
+  readiness and diagnostics, migration 004 restore provenance/intent holds, audited
+  admin release, stale-backup/remote-ledger drills, browser CSP/XSS tests, measured
+  load and tested pre-decode limits. 574 tests pass; full evidence is in the report.
+- **Do not build:** agent/organization editors, approval write UI, production
+  integrations, broader autonomy, SSO claims or distributed infrastructure.
+- **Status:** PASS for local/offline scope. See [Stage 11 report](../STAGE_11_REPORT.md) and ADR-014.
+  Former live-model evaluation goals remain deferred, not silently marked complete.
 
 ## Stage 12 — External integrations
 
@@ -191,9 +202,9 @@ Stages are capability gates, not calendar estimates. A later stage begins only w
 
 ## Immediate next milestone
 
-Stage 10 adds tested local durability, fixture reconciliation and scoped audit reads.
-Recommend a separately authorized Stage 11 reliability/inspection-hardening scope:
-operator recovery contracts, coordinated restore drills, query scale, and a read-only
-local inspection surface over canonical data. Production authentication, real connector
-safety, power-loss reliability and distributed takeover remain unproven. Stage 11 has
-not started; no production write integration has been added.
+Stage 11 adds the tested local operator console, safe restore/release and bounded
+inspection. Recommend scoping Stage 12 around operator usability/accessibility,
+read-model performance, production identity/runbooks and worker fencing before the
+historical external-integration roadmap is attempted. Production authentication,
+connector safety, power-loss reliability and distributed takeover remain unproven.
+No Stage 12 code or production write integration has been added.

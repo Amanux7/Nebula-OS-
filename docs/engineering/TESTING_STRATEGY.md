@@ -1,5 +1,30 @@
 # Testing Strategy
 
+## Stage 11 final acceptance
+
+The full local gate is 574 passing tests (2026-09-29); exact outputs are in
+[Stage 11](../STAGE_11_REPORT.md). New tests exercise every seeded inspection category
+and link, Goal/intent lineage, protected-content omission, restored HTTP inspection,
+audited admin release/denial/race/rollback, stale approval and independent remote
+effect mismatch, path/manifest/partial-output failures, pre-decode capacity checks,
+rate limits, diagnostics and receipt/event concurrent visibility.
+
+tests/fixtures/operator_browser.mjs drives a fresh headless Chromium profile over
+a private CDP pipe, enters a generated test credential and uses the real HTTP UI.
+Stored script/img strings in department descriptions, message metadata, Knowledge
+titles and safe audit metadata render as text. Protected model results never cross
+the DTO boundary. CSP remains unchanged; navigation succeeds without dialogs,
+injected elements, JavaScript exceptions or CSP violations. Node/Chromium are
+optional test tools, not runtime dependencies: environments without them explicitly
+skip this one test and cannot claim browser acceptance. The recorded Windows full
+gate included it with zero skips. Fresh temporary profiles contain test-only state.
+
+Concurrent Goal and ToolReceipt/Event tests use separate SQLite connections and
+assert readers wait for commit and see complete state/audit pairs within 10 seconds.
+These characterize local contention, not fairness, sustained load or distributed
+isolation. Reparse-point rejection has a deterministic mocked Windows-junction
+test; this is not a hostile-filesystem race guarantee.
+
 ## Stage 10 durability gate
 
 Fast Stage 1–9 tests retain in-memory adapters. SQLite integration tests use

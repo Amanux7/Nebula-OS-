@@ -1,5 +1,28 @@
 # System Architecture
 
+## Stage 11 implemented local operator boundary
+
+A loopback-only standard-library HTTP host composes OperatorService,
+OperatorQueryService, AuditQueryService, RecoveryService and metadata-only
+SqliteInspectionCatalog. Each request owns its database connections; canonical
+reads serialize behind SQLite's writer boundary. Authenticated query transactions
+hold identity before canonical state. Initial service opening releases its
+canonical validation transaction before acquiring identity; no reversed nested lock.
+
+The static same-origin console follows structural DTO links, not raw SQL or domain
+object dumps. It covers organization/configuration, plans/materializations,
+delegations/results, messages/handoffs, governance and Tool evidence. No worker,
+model or external executor is started by this host. Admin mode restriction and
+validated quarantine release are the only canonical HTTP mutations; there is no
+approval/recovery execution UI. Four workers, bounded requests, pre-decode capacity
+guards and short local timeouts constrain the inspection profile.
+
+Canonical backup is separate from identity and the remote fixture. Restore
+publishes a fresh quarantined database with immutable provenance and intent holds.
+Release changes mode only; holds remain enforced in the consequential claim
+transaction. See [ADR-014](ADR/ADR-014-operator-control-plane-and-inspection.md),
+[walkthrough](../engineering/OPERATOR_WALKTHROUGH.md) and [evidence](../STAGE_11_REPORT.md).
+
 ## Stage 10 durable service composition
 
 `SqliteStoreGroup` supplies domain, runtime, Knowledge, Memory, Organization,
